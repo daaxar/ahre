@@ -1,10 +1,18 @@
-# AhRE CLI v0.6.0
+# AhRE CLI v0.6.1
 
 AhRE — ArcHitecture Recipe Engine — is a deterministic CLI for LLM-assisted software development.
 
 The LLM decides intent and business logic. AhRE creates/modifies files, registers inventory, exposes slots, refreshes graph/index, runs quality checks, and returns compact JSON feedback.
 
-## What is new in v0.6.0
+## What is new in v0.6.1
+
+- Fixed `architecture.service.ensure` path reporting: `plan` and `apply` now report created/effected files relative to the repository root.
+- Added `pathBase: repository-root` and `serviceRoot: servs/<service>` to service recipe outputs.
+- `architecture.service.ensure` plan now uses the same deterministic baseline file list as apply.
+- Follow-up suggested recipe commands now include `--root <serviceRoot>`.
+- `--service <name>` now resolves to `servs/<name>` for service-scoped recipes.
+
+## What was new in v0.6.0
 
 - Split installable skills:
   - `.agents/ahre-usage/SKILL.md`

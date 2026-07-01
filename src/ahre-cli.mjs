@@ -5,7 +5,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-const VERSION = '0.6.0';
+const VERSION = '0.6.1';
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const INTENTS = [
@@ -392,7 +392,13 @@ function rel(root, file) {
 
 function serviceRoot(cwd, flags) {
   if (flags.root) return path.resolve(cwd, flags.root);
-  if (flags.service) return path.resolve(cwd, flags.service);
+  if (flags['service-dir']) return path.resolve(cwd, flags['service-dir']);
+  if (flags.workspace) return path.resolve(cwd, flags.workspace);
+  if (flags.service) {
+    const service = String(flags.service);
+    if (service.includes('/') || service.startsWith('.')) return path.resolve(cwd, service);
+    return path.join(cwd, 'servs', service);
+  }
   return cwd;
 }
 
@@ -1394,6 +1400,33 @@ function serviceWorkspaceDir(root, flags) {
   return root;
 }
 
+function serviceWorkspaceBaselineFiles(serviceDir) {
+  return [
+    'package.json',
+    'tsconfig.json',
+    'src/index.ts',
+    'src/Kernel.ts',
+    'config/container/services.yaml',
+    'src/Shared/Domain/AggregateRoot.ts',
+    'src/Shared/Domain/ValueObject/Uuid.ts',
+    'src/Shared/Domain/ValueObject/String.ts',
+    'src/Shared/Domain/ValueObject/Number.ts',
+    'src/Shared/Domain/ValueObject/DateTime.ts',
+    'src/Shared/Infrastructure/MessageBus/MessageBus.ts',
+    'src/Shared/Infrastructure/MessageQueue/SqsMessageQueue.ts',
+    'src/Shared/Infrastructure/Security/RbacPolicy.ts',
+    'src/Shared/Infrastructure/Security/JwtVerifier.ts',
+    'src/Shared/Infrastructure/Logs/WinstonLogger.ts',
+    'jest.config.cjs',
+    'tests/steps/world.ts',
+    'Dockerfile',
+    'docker-compose.yml',
+    '.env.dev',
+    '.env.test',
+    'ecosystem.config.js'
+  ].map((item) => path.join(serviceDir, item));
+}
+
 function templateServicePackageJson(serviceName) {
   const packageName = serviceName.startsWith('@') ? serviceName : `@ahre/${kebab(serviceName)}`;
   return JSON.stringify({
@@ -1852,14 +1885,21 @@ export class AhreCli {
     if (subject === 'architecture.service.ensure') {
       const root = serviceRoot(this.cwd, { root: flags.root });
       const target = serviceWorkspaceDir(root, flags);
-      const files = [
-        'package.json', 'tsconfig.json', 'src/index.ts', 'src/Kernel.ts', 'config/container/services.yaml',
-        'Dockerfile', 'docker-compose.yml', '.env.dev', '.env.test', 'ecosystem.config.js',
-        'src/Shared/Domain/AggregateRoot.ts', 'src/Shared/Domain/ValueObject/Uuid.ts',
-        'src/Shared/Infrastructure/Security/RbacPolicy.ts', 'src/Shared/Infrastructure/MessageBus/MessageBus.ts',
-        'tests/unit', 'tests/api', 'tests/command', 'tests/mother', 'tests/steps'
-      ].map((p) => path.join(target, p));
-      const plan = { status: 'OK', mode: 'plan', recipe: subject, subject: flags.service || rel(root, target), root, target: rel(root, target), wouldCreate: files.filter((f) => !exists(f)).map((f) => rel(root, f)), alreadyExists: files.filter((f) => exists(f)).map((f) => rel(root, f)), conflicts: [], warnings: [] };
+      const files = serviceWorkspaceBaselineFiles(target);
+      const plan = {
+        status: 'OK',
+        mode: 'plan',
+        recipe: subject,
+        subject: flags.service || rel(root, target),
+        root,
+        target: rel(root, target),
+        pathBase: 'repository-root',
+        serviceRoot: rel(root, target),
+        wouldCreate: files.filter((f) => !exists(f)).map((f) => rel(root, f)),
+        alreadyExists: files.filter((f) => exists(f)).map((f) => rel(root, f)),
+        conflicts: [],
+        warnings: []
+      };
       if (action === 'plan') return this.output(plan, flags.json);
       const effects = newEffects();
       const serviceDir = ensureServiceWorkspaceBaseline(root, flags, effects);
@@ -1867,7 +1907,22 @@ export class AhreCli {
       updateInventoryArchitecture(serviceDir, inv, subject, flags.service || path.basename(serviceDir), normalizeEffectPaths(serviceDir, effects));
       saveInventory(serviceDir, inv);
       effects.updated.push(inventoryPath(serviceDir));
-      return this.output(await withPostMutationQuality(serviceDir, { status: 'OK', mode: 'apply', recipe: subject, subject: flags.service || path.basename(serviceDir), effects: normalizeEffectPaths(serviceDir, effects), currentKnowledge: { service: { root: rel(root, serviceDir), architecturePack: ARCHITECTURE_PACK.name } }, nextForLLM: ['Use AhRE recipes for bounded contexts and capabilities before manual scaffolding.'], nextSuggestedIntents: ['ahre recipe apply bounded-context.ensure --context <Context> --json', 'ahre recipe apply entity.capability.ensure --entity <Entity> --context <Context> --json'] }, flags, effects), flags.json);
+      const payload = await withPostMutationQuality(serviceDir, {
+        status: 'OK',
+        mode: 'apply',
+        recipe: subject,
+        subject: flags.service || path.basename(serviceDir),
+        pathBase: 'repository-root',
+        serviceRoot: rel(root, serviceDir),
+        effects: normalizeEffectPaths(root, effects),
+        currentKnowledge: { service: { root: rel(root, serviceDir), architecturePack: ARCHITECTURE_PACK.name } },
+        nextForLLM: ['Use AhRE recipes for bounded contexts and capabilities before manual scaffolding.'],
+        nextSuggestedIntents: [
+          `ahre recipe apply bounded-context.ensure --root ${rel(root, serviceDir)} --context <Context> --json`,
+          `ahre recipe apply entity.capability.ensure --root ${rel(root, serviceDir)} --entity <Entity> --context <Context> --json`
+        ]
+      }, flags, effects);
+      return this.output({ ...payload, effects: normalizeEffectPaths(root, effects), pathBase: 'repository-root', serviceRoot: rel(root, serviceDir) }, flags.json);
     }
 
     if (subject === 'bounded-context.ensure') {
