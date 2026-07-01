@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-const VERSION = '0.4.0';
+const VERSION = '0.4.1';
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const INTENTS = [
@@ -895,25 +895,56 @@ const AGENTS_AHRE_BLOCK_END = '<!-- AHRE_USAGE_SKILL_END -->';
 
 function agentsAhreBlock(installedPath) {
   return `${AGENTS_AHRE_BLOCK_START}
-## AhRE usage skill
+## AhRE mandatory usage
 
-This project has the AhRE usage skill installed at:
+This repository uses AhRE — ArcHitecture Recipe Engine.
+
+The AhRE usage skill is installed at:
 
 \`${installedPath}\`
 
-When developing code in this repository, agents must discover and apply that skill before manually creating, modifying, wiring, searching, or verifying architecture/code artifacts.
+Before creating, modifying, wiring, searching, verifying, or planning code/architecture artifacts, agents MUST read and follow that skill.
 
-Prefer AhRE intents and recipes over manual boilerplate when available:
+AhRE is the mandatory first execution path for architecture/code work.
+
+Do NOT manually scaffold or edit these artifacts before attempting AhRE:
+
+- bounded contexts
+- entities/aggregates
+- value objects
+- repository interfaces
+- repository implementations
+- use cases
+- controllers
+- consumers
+- domain events
+- tests
+- DI bindings
+- runtime/config skeletons
+- architecture folders
+
+Minimum required AhRE workflow:
 
 \`\`\`bash
 ahre intents search "<task>" --json
+ahre intents describe <intent> --json
 ahre recipe plan <recipe> --json
 ahre recipe apply <recipe> --json
 ahre inventory get <kind> <id> --json
 ahre verify architecture --json
 \`\`\`
 
-Use manual implementation only when AhRE has no applicable intent/recipe or when business-specific logic must be written by the model/developer.
+Use macro recipes for capabilities and architecture scaffolding.
+Use micro-intents for surgical edits such as adding methods, imports, tests, or bindings.
+
+Manual implementation is allowed only when:
+
+- AhRE is unavailable;
+- AhRE returns \`BLOCKED\`;
+- no applicable recipe/intent exists;
+- the remaining work is business-specific logic that AhRE intentionally leaves as TODO.
+
+When falling back to manual work, state why AhRE was not used.
 ${AGENTS_AHRE_BLOCK_END}`;
 }
 
@@ -981,7 +1012,7 @@ function installSkill({ root, skill, flags }) {
 
 const ARCHITECTURE_PACK = {
   name: 'ms-expeditions-clean-ddd',
-  version: '0.4.0',
+  version: '0.4.1',
   source: 'ARCHITECTURE.md',
   description: 'AhRE architecture pack for TypeScript/Node.js backend services using Clean Architecture, Hexagonal adapters, DDD bounded contexts, CQRS, DI YAML, AMQP/SQS, Mongo/TypeORM/Redis/S3, PDF/XLSX, JWT/RBAC, Jest and Cucumber.',
   policies: [

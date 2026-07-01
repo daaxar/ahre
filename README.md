@@ -1,250 +1,57 @@
-# AhRE CLI v0.4.0
+# AhRE CLI v0.4.1
 
-AhRE — ArcHitecture Recipe Engine.
-
-This version adds the `ms-expeditions-clean-ddd` architecture pack derived from `ARCHITECTURE.md`: executable recipes, inspectable templates, inspectable intents and an exportable pack manifest.
-
-## Architecture pack commands
-
-```bash
-ahre pack list --json
-ahre template list --json
-ahre recipe list --json
-ahre recipe describe entity.capability.ensure --json
-```
-
-## Architecture recipes
-
-```bash
-ahre recipe plan architecture.service.ensure --service ms-expeditions --json
-ahre recipe apply architecture.service.ensure --service ms-expeditions --json
-ahre recipe apply bounded-context.ensure --context Expeditions --root servs/ms-expeditions --json
-ahre recipe apply entity.capability.ensure --entity Expedition --context Expeditions --root servs/ms-expeditions --json
-ahre recipe apply consumer.event.ensure --context Expeditions --event PackageWasScanned --usecase UpdateExpeditionsFromPackageScanned --root servs/ms-expeditions --json
-ahre recipe apply document.pdf.ensure --context Expeditions --name DeliveryNote --root servs/ms-expeditions --json
-ahre recipe apply document.xlsx.ensure --context Expeditions --name ExpeditionReport --root servs/ms-expeditions --json
-```
-
-## Micro intents
-
-```bash
-ahre ensure value-object --context Expeditions --name PackageBarcode --base StringValueObject --root servs/ms-expeditions --json
-ahre ensure domain-event --context Expeditions --event PackageWasScanned --root servs/ms-expeditions --json
-ahre ensure method --context Expeditions --entity Expedition --method owns --params "userId: string, roleGroup: string" --returns boolean --root servs/ms-expeditions --json
-```
-
-# AhRE CLI — ArcHitecture Recipe Engine
-
-AhRE is a CLI-first architecture automation engine for LLM-assisted development.
-
-It executes composable, idempotent intents that converge a repository toward a desired architectural state, then returns compact JSON with effects, inventory, graph, and current semantic knowledge.
-
-The CLI is designed for repositories that use Clean Architecture, Hexagonal Architecture, DDD, CQRS, event-driven messaging, explicit dependency injection, and monorepo boundaries.
-
-## What AhRE does
-
-AhRE is not just a file generator.
+AhRE — ArcHitecture Recipe Engine — is a CLI and recipe engine for architecture-first development with coding agents.
 
 It provides:
 
-- macro recipes;
-- component recipes;
-- micro-intents;
-- AST-aware TypeScript edits with `ts-morph` when installed;
-- conservative fallback patching;
+- architecture recipes;
+- composable intents from macro capabilities to micro code edits;
+- templates;
 - semantic inventory;
-- dependency graph;
-- build-impact planning;
+- dependency graph/build planning;
 - code search;
-- architecture verification;
-- installable LLM usage skill;
-- non-default authoring skills for extending AhRE itself.
+- installable agent skills;
+- architecture packs.
 
-## Install dependencies
+## Install
 
-```bash
-npm install
-```
+The installer is intentionally external to the CLI. AhRE itself stays installer-agnostic.
 
-`ts-morph` is declared as a dependency. Without it, AhRE still works for many operations but reports when it falls back to conservative text patching.
-
-## Installing with curl pipe sh
-
-AhRE ships a minimal external installer at `scripts/install-ahre.sh`. The CLI itself is agnostic to installation. There is no `ahre installer` command.
-
-User command:
+Expected install command:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/daaxar/ahre/main/scripts/install-ahre.sh | sh
 ```
 
-The installer has no flags. It downloads:
+The installer downloads:
 
 ```txt
 https://github.com/daaxar/ahre/archive/refs/heads/main.zip
 ```
 
-Then it unpacks into:
+Then it extracts into:
 
 ```txt
 $HOME/.local/.ahre
 ```
 
-Then it enters:
-
-```txt
-$HOME/.local/.ahre/ahre-main
-```
-
-And runs:
+and runs:
 
 ```bash
+cd $HOME/.local/.ahre/ahre-main
 npm install
 npm install -g .
 ```
 
-See `docs/INSTALL_FROM_RAW.md` for details.
+## Mandatory agent bootstrap
 
-## Basic commands
-
-```bash
-node ./bin/ahre.mjs --version --json
-node ./bin/ahre.mjs intents list --json
-node ./bin/ahre.mjs intents search "entity create http mongo" --json
-node ./bin/ahre.mjs intents describe entity.capability.ensure --json
-```
-
-## Recipe plan/apply
-
-Plan first:
+Install the usage skill in a project:
 
 ```bash
-node ./bin/ahre.mjs recipe plan entity.capability.ensure \
-  --entity User \
-  --context Users \
-  --json
+ahre skill install usage --json
 ```
 
-Apply:
-
-```bash
-node ./bin/ahre.mjs recipe apply entity.capability.ensure \
-  --entity User \
-  --context Users \
-  --json
-```
-
-The recipe ensures, when missing:
-
-- context folders;
-- `AggregateRoot`;
-- base `Uuid` value object;
-- aggregate/entity skeleton;
-- id value object;
-- repository interface;
-- create use case;
-- HTTP controller;
-- Mongo repository skeleton;
-- domain event skeleton;
-- unit/API test skeletons;
-- DI placeholder;
-- semantic inventory.
-
-## Code namespace
-
-The `code` namespace is a LLM-friendly alias over recipe and ensure operations.
-
-```bash
-node ./bin/ahre.mjs code capability --entity User --context Users --json
-node ./bin/ahre.mjs code method --entity User --context Users --method changeEmail --params "email: UserEmail" --returns void --json
-```
-
-## Inventory
-
-AhRE maintains `.ahre/inventory.json` as a semantic cache.
-
-```bash
-node ./bin/ahre.mjs inventory get entity Users.User --json
-node ./bin/ahre.mjs inventory list entities --json
-node ./bin/ahre.mjs inventory rebuild --json
-```
-
-Inventory is not the source of truth. Source code is. Inventory exists to give LLMs compact context.
-
-## Dependency graph and build planning
-
-Build the graph:
-
-```bash
-node ./bin/ahre.mjs graph build --json
-```
-
-Inspect a file node:
-
-```bash
-node ./bin/ahre.mjs graph get file src/Users/Domain/Model/User.ts --json
-```
-
-List affected files:
-
-```bash
-node ./bin/ahre.mjs graph affected src/Users/Domain/Model/User.ts --json
-```
-
-Plan build impact:
-
-```bash
-node ./bin/ahre.mjs build plan --changed src/Users/Domain/Model/User.ts --json
-```
-
-This version does not execute compilation yet. It calculates impacted files and preliminary cache keys.
-
-## Search
-
-```bash
-node ./bin/ahre.mjs search code User --json
-node ./bin/ahre.mjs search code changeEmail --json
-```
-
-Search uses graph and inventory context.
-
-## Verify architecture
-
-```bash
-node ./bin/ahre.mjs verify architecture --json
-```
-
-Current checks include low-cost import rules for Domain/Application layers and cross-boundary relative import hints.
-
-## LLM Skill installation
-
-AhRE bundles a user-facing SKILL for LLMs. This skill teaches the model how to use AhRE, not how to modify AhRE internals.
-
-List installable skills:
-
-```bash
-node ./bin/ahre.mjs skill list --json
-```
-
-List all bundled skills, including non-default authoring skills:
-
-```bash
-node ./bin/ahre.mjs skill list --all --json
-```
-
-Show the usage skill:
-
-```bash
-node ./bin/ahre.mjs skill show usage --json
-```
-
-Install the usage skill into the current project:
-
-```bash
-node ./bin/ahre.mjs skill install usage --json
-```
-
-This creates:
+By default this writes:
 
 ```txt
 .agents/ahre-usage/SKILL.md
@@ -252,98 +59,147 @@ This creates:
 AGENTS.md
 ```
 
-Run doctor:
+If `AGENTS.md` already exists, AhRE appends or updates an idempotent block delimited by:
 
-```bash
-node ./bin/ahre.mjs skill doctor --json
+```txt
+<!-- AHRE_USAGE_SKILL_START -->
+<!-- AHRE_USAGE_SKILL_END -->
 ```
 
-Supported targets:
+The generated `AGENTS.md` block is intentionally strict. It tells isolated coding agents that AhRE is the mandatory first execution path before manually writing code or architecture artifacts.
 
-- `project` → `.agents`
-- `global` → `~/.agents`
-- `path` → explicit `--path` or `--to`
-- `claude` → `.claude/skills`
-- `codex` → `.codex/skills`
-- `opencode` → `.opencode/skills`
+Agents must read `.agents/ahre-usage/SKILL.md` and then use AhRE first for:
 
+- bounded contexts;
+- entities/aggregates;
+- value objects;
+- repositories;
+- use cases;
+- controllers;
+- consumers;
+- domain events;
+- tests;
+- DI bindings;
+- runtime/config skeletons;
+- architecture folders.
 
-### AGENTS.md bootstrap
+Manual work is only a fallback when AhRE is unavailable, returns `BLOCKED`, lacks an applicable intent/recipe, or leaves business-specific TODOs.
 
-When installing the usage skill, AhRE also ensures an `AGENTS.md` file exists at the project root.
-
-- If `AGENTS.md` does not exist, AhRE creates a minimal one.
-- If `AGENTS.md` already exists, AhRE appends an idempotent AhRE block.
-- If the AhRE block already exists, AhRE updates it in place.
-
-The block tells coding agents to discover and use the installed AhRE usage skill before manually creating, modifying, wiring, searching, or verifying code artifacts.
-
-Override the skill destination with:
+To install into another folder:
 
 ```bash
-node ./bin/ahre.mjs skill install usage --to ./custom/skills --json
+ahre skill install usage --to ./custom-agents --json
 ```
 
-Skip `AGENTS.md` bootstrap only when intentionally managing agent instructions elsewhere:
+To avoid touching `AGENTS.md`:
 
 ```bash
-node ./bin/ahre.mjs skill install usage --no-agents-md --json
+ahre skill install usage --no-agents-md --json
 ```
 
-## Authoring skills
-
-AhRE also bundles authoring skills for developers extending AhRE itself:
-
-- `authoring.recipe`
-- `authoring.template`
-- `authoring.intent`
-- `authoring.inventory`
-- `authoring.mcp`
-
-These are **not installed by default**.
-
-Show one:
+## Typical agent workflow
 
 ```bash
-node ./bin/ahre.mjs skill show authoring.recipe --json
+ahre intents search "entity create http mongo" --json
+ahre intents describe entity.capability.ensure --json
+ahre recipe plan entity.capability.ensure --entity User --context Users --json
+ahre recipe apply entity.capability.ensure --entity User --context Users --json
+ahre inventory get entity Users.User --json
+ahre graph build --json
+ahre verify architecture --json
 ```
 
-Export one:
+## Architecture pack
+
+v0.4 includes the `ms-expeditions-clean-ddd` architecture pack derived from the project architecture document.
 
 ```bash
-node ./bin/ahre.mjs skill export authoring.recipe --to ./docs/skills --json
+ahre pack list --json
+ahre template list --json
+ahre recipe list --json
+ahre recipe describe architecture.service.ensure --json
 ```
 
-Installing authoring skills requires an explicit flag:
+### Ensure a service workspace
 
 ```bash
-node ./bin/ahre.mjs skill install authoring.recipe \
-  --target project \
-  --allow-authoring-skills \
+ahre recipe plan architecture.service.ensure --service ms-expeditions --json
+ahre recipe apply architecture.service.ensure --service ms-expeditions --json
+```
+
+### Ensure a bounded context
+
+```bash
+ahre recipe apply bounded-context.ensure \
+  --context Expeditions \
+  --root servs/ms-expeditions \
   --json
 ```
 
-This friction is intentional. Normal project users need the AhRE usage skill, not framework-authoring instructions.
+### Ensure an entity capability
 
-## Recommended LLM integration
-
-Preferred integration stack:
-
-```txt
-AGENTS.md      → governs pipeline and gates
-AhRE SKILL     → teaches when/how to use AhRE
-MCP server     → exposes AhRE as typed tools, when available
-AhRE CLI       → portable execution backend and fallback
-Inventory      → compact semantic context
-Graph          → dependency/build context
+```bash
+ahre recipe apply entity.capability.ensure \
+  --entity Expedition \
+  --context Expeditions \
+  --root servs/ms-expeditions \
+  --json
 ```
 
-Execution preference for models:
+### Ensure a consumer
 
-1. Use AhRE MCP tools if available.
-2. Otherwise use AhRE CLI with `--json`.
-3. Otherwise implement manually using project architecture skills and report the gap.
+```bash
+ahre recipe apply consumer.event.ensure \
+  --context Expeditions \
+  --event PackageWasScanned \
+  --usecase UpdateExpeditionsFromPackageScanned \
+  --root servs/ms-expeditions \
+  --json
+```
 
-## Version
+## Code namespace
 
-Current version: `0.3.5`.
+```bash
+ahre code capability --entity User --context Users --json
+ahre code method --entity User --context Users --method changeEmail --json
+```
+
+## Inventory and graph
+
+```bash
+ahre inventory get entity Users.User --json
+ahre inventory list entities --json
+ahre graph build --json
+ahre graph affected src/Users/Domain/Model/User.ts --json
+ahre build plan --changed src/Users/Domain/Model/User.ts --json
+ahre search code User --json
+```
+
+## Verify
+
+```bash
+ahre verify architecture --json
+```
+
+## Skill commands
+
+```bash
+ahre skill list --json
+ahre skill list --all --json
+ahre skill show usage --json
+ahre skill install usage --json
+ahre skill doctor --json
+```
+
+Authoring skills are not installed by default:
+
+```bash
+ahre skill show authoring.recipe --json
+ahre skill install authoring.recipe --allow-authoring-skills --json
+```
+
+## Development checks
+
+```bash
+npm run check
+```
