@@ -1,7 +1,7 @@
 {
   "name": "ahre-cli",
-  "version": "0.3.0",
-  "description": "AhRE - ArcHitecture Recipe Engine CLI with recipes, AST patching, skills, semantic inventory, graph, search, and build planning",
+  "version": "0.3.1",
+  "description": "AhRE - ArcHitecture Recipe Engine CLI with recipes, AST patching, installable skills, Gist installer, semantic inventory, graph, search, and build planning",
   "type": "module",
   "bin": {
     "ahre": "./bin/ahre.mjs"
@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node ./bin/ahre.mjs",
     "smoke": "node ./bin/ahre.mjs intents list --json && node ./bin/ahre.mjs skill list --all --json && node ./bin/ahre.mjs recipe plan entity.capability.ensure --entity User --context Users --json && node ./bin/ahre.mjs graph build --json",
-    "check": "node --check ./src/ahre-cli.mjs && node --check ./bin/ahre.mjs"
+    "check": "node --check ./src/ahre-cli.mjs && node --check ./bin/ahre.mjs",
+    "installer:show": "node ./bin/ahre.mjs installer show",
+    "installer:export": "node ./bin/ahre.mjs installer export --to ./dist/install-ahre.sh"
   },
   "keywords": [
     "architecture",

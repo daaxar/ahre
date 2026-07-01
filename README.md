@@ -33,6 +33,44 @@ npm install
 
 `ts-morph` is declared as a dependency. Without it, AhRE still works for many operations but reports when it falls back to conservative text patching.
 
+## Installing from a GitHub Gist
+
+AhRE includes a Gist-friendly installer script. The installer itself can be hosted in a GitHub Gist and install the CLI globally for the current user.
+
+Export the installer script:
+
+```bash
+node ./bin/ahre.mjs installer export --to ./dist/install-ahre.sh --json
+```
+
+Host these files in the same Gist:
+
+```txt
+install-ahre.sh
+ahre-cli-v0.3.1.zip
+```
+
+Then users can install with:
+
+```bash
+curl -fsSL https://gist.githubusercontent.com/<owner>/<gist-id>/raw/install-ahre.sh   | sh -s --       --dist-url https://gist.githubusercontent.com/<owner>/<gist-id>/raw/ahre-cli-v0.3.1.zip       --install-skill
+```
+
+By default, the installer uses user-local global installation:
+
+```txt
+~/.ahre/cli/current
+~/.local/bin/ahre
+```
+
+It can also use npm global installation:
+
+```bash
+curl -fsSL <gist-install-url>   | sh -s -- --dist-url <gist-zip-url> --method npm-global
+```
+
+See `docs/INSTALL_FROM_GIST.md` for details.
+
 ## Basic commands
 
 ```bash
@@ -250,4 +288,4 @@ Execution preference for models:
 
 ## Version
 
-Current version: `0.3.0`.
+Current version: `0.3.1`.
