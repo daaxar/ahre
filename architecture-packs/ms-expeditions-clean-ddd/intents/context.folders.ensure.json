@@ -1,0 +1,6 @@
+{
+  "name": "context.folders.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

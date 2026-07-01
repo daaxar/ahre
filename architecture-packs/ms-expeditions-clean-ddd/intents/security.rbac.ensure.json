@@ -1,0 +1,6 @@
+{
+  "name": "security.rbac.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

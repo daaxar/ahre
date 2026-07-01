@@ -1,0 +1,11 @@
+{
+  "name": "document.pdf.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "steps": [
+    "bounded-context.ensure",
+    "pdf.renderer.ensure",
+    "testing.unit.ensure",
+    "di.binding.ensure"
+  ]
+}

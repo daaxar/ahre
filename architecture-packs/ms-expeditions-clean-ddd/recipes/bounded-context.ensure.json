@@ -1,0 +1,9 @@
+{
+  "name": "bounded-context.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "steps": [
+    "context.folders.ensure",
+    "inventory.context.update"
+  ]
+}

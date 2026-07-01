@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-const VERSION = '0.3.5';
+const VERSION = '0.4.0';
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const INTENTS = [
@@ -107,6 +107,86 @@ const INTENTS = [
     safeByDefault: true
   }
 ];
+
+INTENTS.push(
+  {
+    name: 'architecture.pack.list',
+    kind: 'architecture-pack',
+    description: 'List bundled templates, recipes, intents, and policies derived from ARCHITECTURE.md.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'architecture.service.ensure',
+    kind: 'public-recipe',
+    description: 'Ensure a backend service workspace with Kernel, DI YAML, Clean Architecture folders, Docker/runtime files, tests, and shared infrastructure skeletons.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'bounded-context.ensure',
+    kind: 'component-recipe',
+    description: 'Ensure a DDD bounded context folder shape with Domain, Application, and Infrastructure layers.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'value-object.ensure',
+    kind: 'micro-intent',
+    description: 'Ensure a context value object based on a shared primitive base and update semantic inventory.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'domain-event.ensure',
+    kind: 'micro-intent',
+    description: 'Ensure an immutable primitive-only domain event named in past tense.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'consumer.ensure',
+    kind: 'component-recipe',
+    description: 'Ensure an AMQP/SQS-style consumer skeleton that maps incoming messages to application use cases.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'document.pdf.ensure',
+    kind: 'component-recipe',
+    description: 'Ensure a Puppeteer/Handlebars PDF renderer adapter, template placeholder, and test skeleton.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'document.xlsx.ensure',
+    kind: 'component-recipe',
+    description: 'Ensure an XLSX exporter adapter and test skeleton.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'security.rbac.ensure',
+    kind: 'component-recipe',
+    description: 'Ensure shared JWT/RBAC security skeletons with client/logisticOperator/warehouse role groups.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'messaging.shared.ensure',
+    kind: 'component-recipe',
+    description: 'Ensure shared message bus/message queue ports and AMQP/SQS adapter placeholders.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'testing.suite.ensure',
+    kind: 'component-recipe',
+    description: 'Ensure Jest/Cucumber test directory shape, mothers, steps, and placeholder configs.',
+    idempotent: true,
+    safeByDefault: true
+  }
+);
 
 const DEFAULT_POLICY = {
   name: 'clean-ddd-http-mongo',
@@ -898,6 +978,335 @@ function installSkill({ root, skill, flags }) {
   return { status: 'OK', action: status, skill: { name: skill.name, description: skill.description, group: skill.group }, installedPath, manifestPath: rel(root, manifestFile), agentsMd };
 }
 
+
+const ARCHITECTURE_PACK = {
+  name: 'ms-expeditions-clean-ddd',
+  version: '0.4.0',
+  source: 'ARCHITECTURE.md',
+  description: 'AhRE architecture pack for TypeScript/Node.js backend services using Clean Architecture, Hexagonal adapters, DDD bounded contexts, CQRS, DI YAML, AMQP/SQS, Mongo/TypeORM/Redis/S3, PDF/XLSX, JWT/RBAC, Jest and Cucumber.',
+  policies: [
+    {
+      name: 'clean-ddd-http-mongo-amqp',
+      defaults: {
+        layers: ['Domain', 'Application', 'Infrastructure'],
+        transport: 'http',
+        persistence: 'mongo',
+        messaging: 'domain-events',
+        relational: 'typeorm',
+        cache: 'redis',
+        storage: 's3',
+        pdf: 'puppeteer-handlebars',
+        xlsx: 'xlsx',
+        auth: 'jwt-jwks-rbac',
+        testing: 'jest-cucumber',
+        di: 'node-dependency-injection-yaml'
+      }
+    }
+  ],
+  templates: [
+    { name: 'service.package-json', layer: 'workspace', description: 'Service workspace package.json with scripts for build, lint, typecheck, tests, dev and start.' },
+    { name: 'service.kernel', layer: 'runtime', description: 'Kernel bootstrap skeleton for env, DI, logger, persistence, Express, consumers and shutdown.' },
+    { name: 'service.index', layer: 'runtime', description: 'Executable entrypoint that starts Kernel.' },
+    { name: 'shared.aggregate-root', layer: 'domain', description: 'AggregateRoot base with domain event recording and draining.' },
+    { name: 'shared.value-object.uuid', layer: 'domain', description: 'Uuid base value object.' },
+    { name: 'shared.value-object.string', layer: 'domain', description: 'String base value object.' },
+    { name: 'shared.value-object.number', layer: 'domain', description: 'Number and PositiveNumber base value objects.' },
+    { name: 'domain.aggregate', layer: 'domain', description: 'Aggregate/entity skeleton with factory, toPrimitives and TODO invariant markers.' },
+    { name: 'domain.value-object', layer: 'domain', description: 'Context value object extending a shared primitive base.' },
+    { name: 'domain.repository-interface', layer: 'domain', description: 'Repository interface using domain types.' },
+    { name: 'domain.event', layer: 'domain', description: 'Immutable primitive-only domain event.' },
+    { name: 'application.usecase-command', layer: 'application', description: 'Command use case skeleton using repository interface and optional event publisher.' },
+    { name: 'application.finder', layer: 'application', description: 'Read-side finder/query skeleton.' },
+    { name: 'infrastructure.http-controller', layer: 'infrastructure', description: 'routing-controllers HTTP adapter with DTO validation.' },
+    { name: 'infrastructure.mongo-repository', layer: 'infrastructure', description: 'Mongo repository adapter with explicit mapper TODOs.' },
+    { name: 'infrastructure.consumer', layer: 'infrastructure', description: 'AMQP/SQS consumer adapter that delegates to a use case.' },
+    { name: 'infrastructure.pdf-renderer', layer: 'infrastructure', description: 'Puppeteer/Handlebars PDF adapter skeleton.' },
+    { name: 'infrastructure.xlsx-exporter', layer: 'infrastructure', description: 'XLSX exporter adapter skeleton.' },
+    { name: 'shared.security-rbac', layer: 'infrastructure', description: 'JWT/RBAC role policy skeleton.' },
+    { name: 'shared.message-bus', layer: 'infrastructure', description: 'MessageBus port and adapter placeholder.' },
+    { name: 'testing.jest-unit', layer: 'tests', description: 'Jest test skeleton.' },
+    { name: 'testing.cucumber-api', layer: 'tests', description: 'Cucumber API feature skeleton.' },
+    { name: 'testing.cucumber-command', layer: 'tests', description: 'Cucumber command/consumer feature skeleton.' },
+    { name: 'runtime.dockerfile', layer: 'runtime', description: 'Multi-stage Dockerfile skeleton.' },
+    { name: 'runtime.compose', layer: 'runtime', description: 'Docker Compose skeleton with backend, Redis, MariaDB and RabbitMQ.' }
+  ],
+  recipes: [
+    {
+      name: 'architecture.service.ensure',
+      visibility: 'public',
+      description: 'Ensure the complete service workspace baseline required by ARCHITECTURE.md.',
+      steps: ['service.workspace.ensure', 'shared.kernel.ensure', 'messaging.shared.ensure', 'security.rbac.ensure', 'testing.suite.ensure', 'runtime.docker.ensure', 'inventory.update']
+    },
+    {
+      name: 'bounded-context.ensure',
+      visibility: 'public',
+      description: 'Ensure Domain/Application/Infrastructure folder structure for a bounded context.',
+      steps: ['context.folders.ensure', 'inventory.context.update']
+    },
+    {
+      name: 'entity.capability.ensure',
+      visibility: 'public',
+      description: 'Ensure an entity create capability across domain, application, HTTP, Mongo, event, DI placeholder and tests.',
+      steps: ['bounded-context.ensure', 'shared.kernel.ensure', 'entity.ensure', 'value-object.ensure', 'repository.interface.ensure', 'usecase.command.ensure', 'controller.http.ensure', 'repository.mongo.ensure', 'domain-event.ensure', 'testing.unit.ensure', 'testing.api.ensure', 'di.binding.ensure', 'inventory.update']
+    },
+    {
+      name: 'consumer.event.ensure',
+      visibility: 'public',
+      description: 'Ensure a message consumer reacting to a domain/integration event.',
+      steps: ['bounded-context.ensure', 'consumer.ensure', 'testing.command.ensure', 'di.binding.ensure', 'inventory.update']
+    },
+    {
+      name: 'document.pdf.ensure',
+      visibility: 'public',
+      description: 'Ensure a PDF rendering adapter and related test/template placeholders.',
+      steps: ['bounded-context.ensure', 'pdf.renderer.ensure', 'testing.unit.ensure', 'di.binding.ensure', 'inventory.update']
+    },
+    {
+      name: 'document.xlsx.ensure',
+      visibility: 'public',
+      description: 'Ensure an XLSX export adapter and related test placeholder.',
+      steps: ['bounded-context.ensure', 'xlsx.exporter.ensure', 'testing.unit.ensure', 'di.binding.ensure', 'inventory.update']
+    }
+  ],
+  intents: [
+    { name: 'service.workspace.ensure', level: 'macro', description: 'Create package/runtime/Docker/test/config shape for a service.' },
+    { name: 'context.folders.ensure', level: 'component', description: 'Create context folder shape.' },
+    { name: 'entity.ensure', level: 'component', description: 'Create aggregate skeleton.' },
+    { name: 'value-object.ensure', level: 'micro', description: 'Create value object.' },
+    { name: 'repository.interface.ensure', level: 'micro', description: 'Create domain repository interface.' },
+    { name: 'repository.mongo.ensure', level: 'component', description: 'Create Mongo adapter.' },
+    { name: 'usecase.command.ensure', level: 'component', description: 'Create command use case.' },
+    { name: 'controller.http.ensure', level: 'component', description: 'Create HTTP controller.' },
+    { name: 'consumer.ensure', level: 'component', description: 'Create consumer adapter.' },
+    { name: 'method.ensure', level: 'micro', description: 'Add method with AST when available.' },
+    { name: 'di.binding.ensure', level: 'micro', description: 'Append DI binding placeholder.' },
+    { name: 'inventory.update', level: 'internal', description: 'Update semantic inventory.' }
+  ]
+};
+
+function serviceWorkspaceDir(root, flags) {
+  if (flags['service-dir']) return path.resolve(root, flags['service-dir']);
+  if (flags.workspace) return path.resolve(root, flags.workspace);
+  if (flags.service) {
+    const service = String(flags.service);
+    if (service.includes('/') || service.startsWith('.')) return path.resolve(root, service);
+    return path.join(root, 'servs', service);
+  }
+  return root;
+}
+
+function templateServicePackageJson(serviceName) {
+  const packageName = serviceName.startsWith('@') ? serviceName : `@ahre/${kebab(serviceName)}`;
+  return JSON.stringify({
+    name: packageName,
+    version: '0.1.0',
+    private: true,
+    type: 'module',
+    scripts: {
+      build: 'tsc -p tsconfig.json',
+      typecheck: 'tsc -p tsconfig.json --noEmit',
+      lint: 'eslint .',
+      test: 'npm run test:unit && npm run test:api && npm run test:command',
+      'test:unit': 'jest --config jest.config.cjs --passWithNoTests',
+      'test:api': 'cucumber-js tests/api --publish-quiet || true',
+      'test:command': 'cucumber-js tests/command --publish-quiet || true',
+      dev: 'node --watch src/index.ts',
+      start: 'node dist/index.js'
+    },
+    dependencies: {
+      express: '^5.1.0',
+      'routing-controllers': '^0.11.3',
+      'class-validator': '^0.14.0',
+      'class-transformer': '^0.5.1',
+      'node-dependency-injection': '^3.0.0'
+    },
+    devDependencies: {
+      typescript: '^5.9.3',
+      jest: '^30.0.0',
+      '@cucumber/cucumber': '^11.0.0',
+      eslint: '^9.0.0',
+      prettier: '^3.0.0'
+    }
+  }, null, 2) + '\n';
+}
+
+function templateTsConfig() {
+  return JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext', moduleResolution: 'NodeNext', strict: true, esModuleInterop: true, skipLibCheck: true, outDir: 'dist', rootDir: 'src', experimentalDecorators: true, emitDecoratorMetadata: true }, include: ['src/**/*.ts', 'tests/**/*.ts'] }, null, 2) + '\n';
+}
+
+function templateIndex() {
+  return `import { Kernel } from './Kernel';\n\nconst kernel = new Kernel();\n\nkernel.start().catch((error) => {\n  // eslint-disable-next-line no-console\n  console.error(error);\n  process.exitCode = 1;\n});\n`;
+}
+
+function templateKernel() {
+  return `export class Kernel {\n  public async start(): Promise<void> {\n    // ARCH_TODO[kind=runtime artifact=Kernel.start] Load env/config.\n    // ARCH_TODO[kind=di artifact=Kernel.start] Load node-dependency-injection YAML container.\n    // ARCH_TODO[kind=logging artifact=Kernel.start] Initialize Winston logger.\n    // ARCH_TODO[kind=persistence artifact=Kernel.start] Initialize Mongo/TypeORM/Redis/S3 connections.\n    // ARCH_TODO[kind=http artifact=Kernel.start] Start Express/routing-controllers server.\n    // ARCH_TODO[kind=messaging artifact=Kernel.start] Register AMQP/SQS consumers.\n  }\n\n  public async stop(): Promise<void> {\n    // ARCH_TODO[kind=runtime artifact=Kernel.stop] Gracefully close HTTP, queues and persistence connections.\n  }\n}\n`;
+}
+
+function templateServicesYaml() {
+  return `# AhRE managed DI placeholders.\n# Runtime DI uses node-dependency-injection YAML.\nservices: {}\n`;
+}
+
+function templateDockerfile() {
+  return `FROM node:20-alpine AS base\nWORKDIR /app\n\nFROM base AS build\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nRUN npm run build\n\nFROM base AS local\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nCMD [\"npm\", \"run\", \"dev\"]\n\nFROM base AS tests\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nCMD [\"npm\", \"test\"]\n\nFROM base AS production\nCOPY package*.json ./\nRUN npm install --omit=dev\nCOPY --from=build /app/dist ./dist\nCMD [\"node\", \"dist/index.js\"]\n`;
+}
+
+function templateCompose(serviceName) {
+  const n = kebab(serviceName || 'service');
+  return `services:\n  ${n}:\n    build:\n      context: .\n      target: local\n    ports:\n      - \"8001:8001\"\n    env_file:\n      - .env.dev\n    depends_on:\n      - redis\n      - mariadb\n      - rabbitmq\n\n  redis:\n    image: redis:5-alpine\n    ports:\n      - \"6001:6379\"\n\n  mariadb:\n    image: mariadb:11\n    environment:\n      MYSQL_ROOT_PASSWORD: root\n      MYSQL_DATABASE: ahre\n    ports:\n      - \"3001:3306\"\n\n  rabbitmq:\n    image: rabbitmq:3-management\n    ports:\n      - \"5001:5672\"\n      - \"15672:15672\"\n`;
+}
+
+function templateEcosystem() {
+  return `export default {\n  apps: [\n    {\n      name: 'ahre-service',\n      script: 'dist/index.js',\n      instances: 1,\n      exec_mode: 'fork'\n    }\n  ]\n};\n`;
+}
+
+function templateStringBase() {
+  return `export abstract class StringValueObject {\n  public readonly value: string;\n\n  protected constructor(value: string) {\n    if (typeof value !== 'string' || value.length === 0) throw new Error('Invalid string value object');\n    this.value = value;\n  }\n\n  public equals(other: StringValueObject): boolean {\n    return this.value === other.value;\n  }\n\n  public toString(): string {\n    return this.value;\n  }\n}\n`;
+}
+
+function templateNumberBase() {
+  return `export abstract class NumberValueObject {\n  public readonly value: number;\n\n  protected constructor(value: number) {\n    if (typeof value !== 'number' || Number.isNaN(value)) throw new Error('Invalid number value object');\n    this.value = value;\n  }\n}\n\nexport abstract class PositiveNumberValueObject extends NumberValueObject {\n  protected constructor(value: number) {\n    super(value);\n    if (value <= 0) throw new Error('Expected positive number');\n  }\n}\n`;
+}
+
+function templateDateTimeBase() {
+  return `export abstract class DateTimeValueObject {\n  public readonly value: Date;\n\n  protected constructor(value: Date) {\n    if (!(value instanceof Date) || Number.isNaN(value.getTime())) throw new Error('Invalid DateTime value object');\n    this.value = value;\n  }\n\n  public toISOString(): string {\n    return this.value.toISOString();\n  }\n}\n`;
+}
+
+function templateGenericValueObject({ name, base = 'StringValueObject' }) {
+  const baseFile = base === 'Uuid' ? 'Uuid' : base === 'DateTimeValueObject' ? 'DateTime' : base.includes('Number') ? 'Number' : 'String';
+  const primitive = base === 'Uuid' || base.includes('String') ? 'string' : base.includes('Number') ? 'number' : base.includes('DateTime') ? 'Date' : 'string';
+  return `import { ${base} } from '../../../Shared/Domain/ValueObject/${baseFile}';\n\nexport class ${name} extends ${base} {\n  public constructor(value: ${primitive}) {\n    super(value);\n  }\n}\n`;
+}
+
+function templateFinder({ entity }) {
+  return `import { ${entity}Repository } from '../../../Domain/Repository/${entity}Repository';\nimport { ${entity}Id } from '../../../Domain/ValueObject/${entity}Id';\n\nexport class Get${entity} {\n  public constructor(private readonly repository: ${entity}Repository) {}\n\n  public async run(id: string): Promise<{ id: string } | null> {\n    const ${camel(entity)} = await this.repository.search(new ${entity}Id(id));\n    return ${camel(entity)}?.toPrimitives() ?? null;\n  }\n}\n`;
+}
+
+function templateConsumer({ consumer, event, useCase }) {
+  return `import { ${useCase} } from '../../../Application/UseCase/${useCase}/${useCase}';\n\nexport interface ${consumer}Message {\n  aggregateId: string;\n  occurredOn?: string;\n}\n\nexport class ${consumer} {\n  public constructor(private readonly useCase: ${useCase}) {}\n\n  public async consume(message: ${consumer}Message): Promise<void> {\n    // ARCH_TODO[kind=consumer-validation artifact=${consumer}.consume] Validate ${event} payload shape.\n    // ARCH_TODO[kind=idempotency artifact=${consumer}.consume] Add idempotency guard before side effects.\n    void message;\n    // Delegate to application use case. Do not place business rules in the consumer.\n  }\n}\n`;
+}
+
+function templatePdfRenderer({ name }) {
+  return `export interface ${name}PdfInput {\n  id: string;\n}\n\nexport class ${name}PdfRenderer {\n  public async render(input: ${name}PdfInput): Promise<Buffer> {\n    // ARCH_TODO[kind=pdf artifact=${name}PdfRenderer.render] Render with Puppeteer + Handlebars template.\n    void input;\n    return Buffer.from('');\n  }\n}\n`;
+}
+
+function templateXlsxExporter({ name }) {
+  return `export interface ${name}XlsxRow {\n  id: string;\n}\n\nexport class ${name}XlsxExporter {\n  public async export(rows: ${name}XlsxRow[]): Promise<Buffer> {\n    // ARCH_TODO[kind=xlsx artifact=${name}XlsxExporter.export] Serialize with xlsx package.\n    void rows;\n    return Buffer.from('');\n  }\n}\n`;
+}
+
+function templateRbac() {
+  return `export type RoleGroup = 'client' | 'logisticOperator' | 'warehouse';\n\nexport class RbacPolicy {\n  public can(role: RoleGroup, action: string, resource: string): boolean {\n    // ARCH_TODO[kind=security artifact=RbacPolicy.can] Wire AccessControl-style permissions.\n    void action;\n    void resource;\n    return ['client', 'logisticOperator', 'warehouse'].includes(role);\n  }\n}\n`;
+}
+
+function templateJwtVerifier() {
+  return `export interface AuthenticatedUser {\n  id: string;\n  roles: string[];\n}\n\nexport class JwtVerifier {\n  public async verify(token: string): Promise<AuthenticatedUser> {\n    // ARCH_TODO[kind=security artifact=JwtVerifier.verify] Validate JWT with jsonwebtoken + jwks-rsa.\n    void token;\n    throw new Error('Not implemented');\n  }\n}\n`;
+}
+
+function templateMessageBus() {
+  return `export interface DomainEvent {\n  aggregateId: string;\n  occurredOn: string;\n}\n\nexport interface MessageBus {\n  publish(events: DomainEvent[]): Promise<void>;\n}\n\nexport class InMemoryMessageBus implements MessageBus {\n  public readonly published: DomainEvent[] = [];\n\n  public async publish(events: DomainEvent[]): Promise<void> {\n    this.published.push(...events);\n  }\n}\n`;
+}
+
+function templateWinstonLogger() {
+  return `export class WinstonLogger {\n  public info(message: string, meta: Record<string, unknown> = {}): void {\n    // ARCH_TODO[kind=logging artifact=WinstonLogger.info] Wire Winston logger.\n    void message;\n    void meta;\n  }\n\n  public error(message: string, meta: Record<string, unknown> = {}): void {\n    // ARCH_TODO[kind=logging artifact=WinstonLogger.error] Wire Winston error logger.\n    void message;\n    void meta;\n  }\n}\n`;
+}
+
+function ensureSharedKernelFull(root, effects) {
+  ensureBaseShared(root, effects);
+  writeIfMissing(path.join(srcRoot(root), 'Shared', 'Domain', 'ValueObject', 'String.ts'), templateStringBase(), effects);
+  writeIfMissing(path.join(srcRoot(root), 'Shared', 'Domain', 'ValueObject', 'Number.ts'), templateNumberBase(), effects);
+  writeIfMissing(path.join(srcRoot(root), 'Shared', 'Domain', 'ValueObject', 'DateTime.ts'), templateDateTimeBase(), effects);
+}
+
+function ensureTestingSuite(root, effects) {
+  const dirs = ['tests/unit', 'tests/api', 'tests/command', 'tests/mother', 'tests/steps'];
+  for (const d of dirs) ensureDir(path.join(root, d));
+  writeIfMissing(path.join(root, 'jest.config.cjs'), `module.exports = { testEnvironment: 'node', testMatch: ['**/tests/unit/**/*.test.ts'] };\n`, effects);
+  writeIfMissing(path.join(root, 'tests', 'steps', 'world.ts'), `// ARCH_TODO[kind=test-steps artifact=world] Configure Cucumber world and shared test context.\n`, effects);
+}
+
+function ensureRuntimeDocker(root, serviceName, effects) {
+  writeIfMissing(path.join(root, 'Dockerfile'), templateDockerfile(), effects);
+  writeIfMissing(path.join(root, 'docker-compose.yml'), templateCompose(serviceName), effects);
+  writeIfMissing(path.join(root, '.env.dev'), `NODE_ENV=development\nPORT=8001\n`, effects);
+  writeIfMissing(path.join(root, '.env.test'), `NODE_ENV=test\nPORT=0\n`, effects);
+  writeIfMissing(path.join(root, 'ecosystem.config.js'), templateEcosystem(), effects);
+}
+
+function ensureSecurity(root, effects) {
+  const dir = path.join(srcRoot(root), 'Shared', 'Infrastructure', 'Security');
+  writeIfMissing(path.join(dir, 'RbacPolicy.ts'), templateRbac(), effects);
+  writeIfMissing(path.join(dir, 'JwtVerifier.ts'), templateJwtVerifier(), effects);
+}
+
+function ensureMessaging(root, effects) {
+  writeIfMissing(path.join(srcRoot(root), 'Shared', 'Infrastructure', 'MessageBus', 'MessageBus.ts'), templateMessageBus(), effects);
+  writeIfMissing(path.join(srcRoot(root), 'Shared', 'Infrastructure', 'MessageQueue', 'SqsMessageQueue.ts'), `export class SqsMessageQueue {\n  public async send(message: unknown): Promise<void> {\n    // ARCH_TODO[kind=message-queue artifact=SqsMessageQueue.send] Wire AWS SQS client.\n    void message;\n  }\n}\n`, effects);
+}
+
+function ensureLogging(root, effects) {
+  writeIfMissing(path.join(srcRoot(root), 'Shared', 'Infrastructure', 'Logs', 'WinstonLogger.ts'), templateWinstonLogger(), effects);
+}
+
+function ensureServiceWorkspaceBaseline(repoRoot, flags, effects) {
+  const serviceName = flags.service ? kebab(flags.service) : kebab(path.basename(repoRoot));
+  const serviceDir = serviceWorkspaceDir(repoRoot, flags);
+  ensureDir(serviceDir);
+  writeIfMissing(path.join(serviceDir, 'package.json'), templateServicePackageJson(flags.package || serviceName || 'ahre-service'), effects);
+  writeIfMissing(path.join(serviceDir, 'tsconfig.json'), templateTsConfig(), effects);
+  writeIfMissing(path.join(serviceDir, 'src', 'index.ts'), templateIndex(), effects);
+  writeIfMissing(path.join(serviceDir, 'src', 'Kernel.ts'), templateKernel(), effects);
+  writeIfMissing(path.join(serviceDir, 'config', 'container', 'services.yaml'), templateServicesYaml(), effects);
+  ensureSharedKernelFull(serviceDir, effects);
+  ensureMessaging(serviceDir, effects);
+  ensureSecurity(serviceDir, effects);
+  ensureLogging(serviceDir, effects);
+  ensureTestingSuite(serviceDir, effects);
+  ensureRuntimeDocker(serviceDir, serviceName, effects);
+  return serviceDir;
+}
+
+function ensureContextOnly(root, context, effects) {
+  ensureContext(root, context, effects);
+  const dirs = contextDirs(root, context);
+  for (const dir of [dirs.domain, dirs.model, dirs.valueObject, dirs.repository, dirs.event, path.join(dirs.domain, 'Collection'), path.join(dirs.domain, 'Specification'), path.join(dirs.domain, 'Error'), path.join(dirs.domain, 'Exception'), path.join(dirs.domain, 'Iterator'), dirs.application, dirs.useCase, path.join(dirs.application, 'Service'), dirs.infrastructure, dirs.persistence, path.join(dirs.infrastructure, 'Pdf'), path.join(dirs.infrastructure, 'Xlsx'), path.join(dirs.infrastructure, 'Express'), dirs.controller, dirs.consumer]) {
+    ensureDir(dir);
+  }
+}
+
+function ensureValueObjectArtifact(root, context, name, base, effects) {
+  ensureSharedKernelFull(root, effects);
+  ensureContextOnly(root, context, effects);
+  writeIfMissing(path.join(contextDirs(root, context).valueObject, `${name}.ts`), templateGenericValueObject({ name, base }), effects);
+}
+
+function ensureEventArtifact(root, context, event, effects) {
+  ensureContextOnly(root, context, effects);
+  writeIfMissing(path.join(contextDirs(root, context).event, `${event}.ts`), `export class ${event} {\n  public constructor(\n    public readonly aggregateId: string,\n    public readonly occurredOn: string = new Date().toISOString()\n  ) {}\n}\n`, effects);
+}
+
+function ensureConsumerArtifact(root, context, event, consumerName, useCase, effects) {
+  ensureContextOnly(root, context, effects);
+  writeIfMissing(path.join(contextDirs(root, context).consumer, `${consumerName}.ts`), templateConsumer({ consumer: consumerName, event, useCase }), effects);
+  writeIfMissing(path.join(root, 'tests', 'command', context, `${kebab(consumerName)}.feature`), `Feature: ${consumerName}\n\n  Scenario: Consume ${event}\n    Given a valid ${event} message\n    When the ${consumerName} consumes the message\n    Then the expected application use case should be executed\n`, effects);
+}
+
+function ensurePdfArtifact(root, context, name, effects) {
+  ensureContextOnly(root, context, effects);
+  writeIfMissing(path.join(contextDirs(root, context).infrastructure, 'Pdf', `${name}PdfRenderer.ts`), templatePdfRenderer({ name }), effects);
+  writeIfMissing(path.join(contextDirs(root, context).infrastructure, 'Pdf', `${kebab(name)}.hbs`), `<html><body>\n  <!-- ARCH_TODO[kind=pdf-template artifact=${name}] Define Handlebars template. -->\n</body></html>\n`, effects);
+  writeIfMissing(path.join(root, 'tests', 'unit', context, 'Infrastructure', 'Pdf', `${name}PdfRenderer.test.ts`), `describe('${name}PdfRenderer', () => {\n  it('has a pending deterministic render test', () => {\n    expect(true).toBe(true);\n  });\n});\n`, effects);
+}
+
+function ensureXlsxArtifact(root, context, name, effects) {
+  ensureContextOnly(root, context, effects);
+  writeIfMissing(path.join(contextDirs(root, context).infrastructure, 'Xlsx', `${name}XlsxExporter.ts`), templateXlsxExporter({ name }), effects);
+  writeIfMissing(path.join(root, 'tests', 'unit', context, 'Infrastructure', 'Xlsx', `${name}XlsxExporter.test.ts`), `describe('${name}XlsxExporter', () => {\n  it('has a pending deterministic export test', () => {\n    expect(true).toBe(true);\n  });\n});\n`, effects);
+}
+
+function updateInventoryArchitecture(root, inv, operation, subject, effects, extra = {}) {
+  inv.architecturePack ??= { name: ARCHITECTURE_PACK.name, version: ARCHITECTURE_PACK.version, source: ARCHITECTURE_PACK.source };
+  inv.operations.push({ at: new Date().toISOString(), intent: operation, subject, effects, ...extra });
+}
+
 export class AhreCli {
   constructor({ cwd }) {
     this.cwd = cwd;
@@ -918,6 +1327,8 @@ export class AhreCli {
     if (group === 'graph') return await this.handleGraph(action, subject, maybe, flags);
     if (group === 'build') return await this.handleBuild(action, subject, maybe, flags);
     if (group === 'search') return await this.handleSearch(action, subject, maybe, flags);
+    if (group === 'pack') return this.handlePack(action, subject, maybe, flags);
+    if (group === 'template' || group === 'templates') return this.handleTemplate(action, subject, maybe, flags);
     if (group === 'skill') return this.handleSkill(action, subject, maybe, flags);
     throw new Error(`Unknown command group: ${group}`);
   }
@@ -953,15 +1364,106 @@ export class AhreCli {
   }
 
   handleRecipe(action, subject, flags) {
+    if (action === 'list') {
+      return this.output({ status: 'OK', pack: ARCHITECTURE_PACK.name, recipes: ARCHITECTURE_PACK.recipes }, flags.json);
+    }
+    if (action === 'describe' || action === 'show') {
+      const recipe = ARCHITECTURE_PACK.recipes.find((item) => item.name === subject);
+      if (!recipe) return this.output({ status: 'NOT_FOUND', recipe: subject }, flags.json);
+      return this.output({ status: 'OK', pack: ARCHITECTURE_PACK.name, recipe }, flags.json);
+    }
     if (!['plan', 'apply'].includes(action)) throw new Error(`Unknown recipe action: ${action}`);
-    if (subject !== 'entity.capability.ensure') throw new Error(`Unknown recipe: ${subject}`);
-    const root = serviceRoot(this.cwd, flags);
-    const entity = pascal(flags.entity);
-    const context = pascal(flags.context);
-    if (!entity || !context) throw new Error('--entity and --context are required');
-    const plan = this.planEntityCapability({ root, entity, context, flags });
-    if (action === 'plan') return this.output({ ...plan, forceJson: flags.json }, flags.json);
-    return this.applyEntityCapability({ root, entity, context, flags, plan });
+
+    if (subject === 'architecture.service.ensure') {
+      const root = serviceRoot(this.cwd, { root: flags.root });
+      const target = serviceWorkspaceDir(root, flags);
+      const files = [
+        'package.json', 'tsconfig.json', 'src/index.ts', 'src/Kernel.ts', 'config/container/services.yaml',
+        'Dockerfile', 'docker-compose.yml', '.env.dev', '.env.test', 'ecosystem.config.js',
+        'src/Shared/Domain/AggregateRoot.ts', 'src/Shared/Domain/ValueObject/Uuid.ts',
+        'src/Shared/Infrastructure/Security/RbacPolicy.ts', 'src/Shared/Infrastructure/MessageBus/MessageBus.ts',
+        'tests/unit', 'tests/api', 'tests/command', 'tests/mother', 'tests/steps'
+      ].map((p) => path.join(target, p));
+      const plan = { status: 'OK', mode: 'plan', recipe: subject, subject: flags.service || rel(root, target), root, target: rel(root, target), wouldCreate: files.filter((f) => !exists(f)).map((f) => rel(root, f)), alreadyExists: files.filter((f) => exists(f)).map((f) => rel(root, f)), conflicts: [], warnings: [] };
+      if (action === 'plan') return this.output(plan, flags.json);
+      const effects = newEffects();
+      const serviceDir = ensureServiceWorkspaceBaseline(root, flags, effects);
+      const inv = loadInventory(serviceDir);
+      updateInventoryArchitecture(serviceDir, inv, subject, flags.service || path.basename(serviceDir), normalizeEffectPaths(serviceDir, effects));
+      saveInventory(serviceDir, inv);
+      effects.updated.push(inventoryPath(serviceDir));
+      return this.output({ status: 'OK', mode: 'apply', recipe: subject, subject: flags.service || path.basename(serviceDir), effects: normalizeEffectPaths(serviceDir, effects), currentKnowledge: { service: { root: rel(root, serviceDir), architecturePack: ARCHITECTURE_PACK.name } }, nextSuggestedIntents: ['ahre recipe apply bounded-context.ensure --context <Context> --json', 'ahre recipe apply entity.capability.ensure --entity <Entity> --context <Context> --json'] }, flags.json);
+    }
+
+    if (subject === 'bounded-context.ensure') {
+      const root = serviceRoot(this.cwd, flags);
+      const context = pascal(flags.context || flags.name);
+      if (!context) throw new Error('bounded-context.ensure requires --context <Context>');
+      const dirs = Object.values(contextDirs(root, context));
+      const plan = { status: 'OK', mode: 'plan', recipe: subject, subject: context, root, wouldCreate: dirs.filter((d) => !exists(d)).map((d) => rel(root, d)), alreadyExists: dirs.filter((d) => exists(d)).map((d) => rel(root, d)), conflicts: [], warnings: [] };
+      if (action === 'plan') return this.output(plan, flags.json);
+      const effects = newEffects();
+      ensureContextOnly(root, context, effects);
+      const inv = loadInventory(root);
+      inv.contexts[context] ??= { entities: [] };
+      updateInventoryArchitecture(root, inv, subject, context, normalizeEffectPaths(root, effects));
+      saveInventory(root, inv);
+      effects.updated.push(inventoryPath(root));
+      return this.output({ status: 'OK', mode: 'apply', recipe: subject, subject: context, effects: normalizeEffectPaths(root, effects), currentKnowledge: { context: inv.contexts[context] } }, flags.json);
+    }
+
+    if (subject === 'entity.capability.ensure') {
+      const root = serviceRoot(this.cwd, flags);
+      const entity = pascal(flags.entity);
+      const context = pascal(flags.context);
+      if (!entity || !context) throw new Error('--entity and --context are required');
+      const plan = this.planEntityCapability({ root, entity, context, flags });
+      if (action === 'plan') return this.output({ ...plan, forceJson: flags.json }, flags.json);
+      return this.applyEntityCapability({ root, entity, context, flags, plan });
+    }
+
+    if (subject === 'consumer.event.ensure') {
+      const root = serviceRoot(this.cwd, flags);
+      const context = pascal(flags.context);
+      const event = pascal(flags.event);
+      const useCase = pascal(flags.usecase || flags['use-case'] || `Handle${event}`);
+      const consumerName = pascal(flags.consumer || `${event}Consumer`);
+      if (!context || !event) throw new Error('consumer.event.ensure requires --context and --event');
+      const consumerFile = path.join(contextDirs(root, context).consumer, `${consumerName}.ts`);
+      const plan = { status: 'OK', mode: 'plan', recipe: subject, subject: `${context}.${consumerName}`, wouldCreate: [consumerFile, path.join(root, 'tests', 'command', context, `${kebab(consumerName)}.feature`)].filter((f) => !exists(f)).map((f) => rel(root, f)), alreadyExists: [consumerFile].filter((f) => exists(f)).map((f) => rel(root, f)), conflicts: [], warnings: [] };
+      if (action === 'plan') return this.output(plan, flags.json);
+      const effects = newEffects();
+      ensureConsumerArtifact(root, context, event, consumerName, useCase, effects);
+      const inv = loadInventory(root);
+      inv.consumers ??= {};
+      inv.consumers[`${context}.${consumerName}`] = { context, event, consumerName, useCase, path: `src/${context}/Infrastructure/UI/Consumer/${consumerName}.ts`, status: 'skeleton' };
+      updateInventoryArchitecture(root, inv, subject, `${context}.${consumerName}`, normalizeEffectPaths(root, effects));
+      saveInventory(root, inv);
+      effects.updated.push(inventoryPath(root));
+      return this.output({ status: 'OK', mode: 'apply', recipe: subject, subject: `${context}.${consumerName}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { consumer: inv.consumers[`${context}.${consumerName}`] } }, flags.json);
+    }
+
+    if (subject === 'document.pdf.ensure' || subject === 'document.xlsx.ensure') {
+      const root = serviceRoot(this.cwd, flags);
+      const context = pascal(flags.context);
+      const name = pascal(flags.name || flags.document || flags.entity);
+      if (!context || !name) throw new Error(`${subject} requires --context and --name/--document`);
+      const effects = newEffects();
+      const isPdf = subject.includes('pdf');
+      const target = isPdf ? path.join(contextDirs(root, context).infrastructure, 'Pdf', `${name}PdfRenderer.ts`) : path.join(contextDirs(root, context).infrastructure, 'Xlsx', `${name}XlsxExporter.ts`);
+      const plan = { status: 'OK', mode: 'plan', recipe: subject, subject: `${context}.${name}`, wouldCreate: exists(target) ? [] : [rel(root, target)], alreadyExists: exists(target) ? [rel(root, target)] : [], conflicts: [], warnings: [] };
+      if (action === 'plan') return this.output(plan, flags.json);
+      if (isPdf) ensurePdfArtifact(root, context, name, effects); else ensureXlsxArtifact(root, context, name, effects);
+      const inv = loadInventory(root);
+      inv.documents ??= {};
+      inv.documents[`${context}.${name}.${isPdf ? 'pdf' : 'xlsx'}`] = { context, name, kind: isPdf ? 'pdf' : 'xlsx', status: 'skeleton', path: rel(root, target) };
+      updateInventoryArchitecture(root, inv, subject, `${context}.${name}`, normalizeEffectPaths(root, effects));
+      saveInventory(root, inv);
+      effects.updated.push(inventoryPath(root));
+      return this.output({ status: 'OK', mode: 'apply', recipe: subject, subject: `${context}.${name}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { document: inv.documents[`${context}.${name}.${isPdf ? 'pdf' : 'xlsx'}`] } }, flags.json);
+    }
+
+    throw new Error(`Unknown recipe: ${subject}`);
   }
 
   planEntityCapability({ root, entity, context, flags }) {
@@ -1065,6 +1567,67 @@ export class AhreCli {
       const normalized = normalizeEffectPaths(root, effects);
       return this.output({ status: normalized.blocked.length ? 'BLOCKED' : 'OK', intent: 'method.ensure', subject: `${key}.${method}`, step, effects: normalized, currentKnowledge: { entity: inv.entities[key] } }, flags.json);
     }
+    if (action === 'value-object' || action === 'vo') {
+      const root = serviceRoot(this.cwd, flags);
+      const context = pascal(flags.context);
+      const name = pascal(flags.name || subject);
+      const base = flags.base || (name.endsWith('Id') ? 'Uuid' : 'StringValueObject');
+      if (!context || !name) throw new Error('ensure value-object requires --context and --name');
+      const effects = newEffects();
+      ensureValueObjectArtifact(root, context, name, base, effects);
+      const inv = loadInventory(root);
+      inv.valueObjects ??= {};
+      inv.valueObjects[`${context}.${name}`] = { context, name, base, path: `src/${context}/Domain/ValueObject/${name}.ts`, status: 'skeleton' };
+      updateInventoryArchitecture(root, inv, 'value-object.ensure', `${context}.${name}`, normalizeEffectPaths(root, effects));
+      saveInventory(root, inv);
+      effects.updated.push(inventoryPath(root));
+      return this.output({ status: 'OK', intent: 'value-object.ensure', subject: `${context}.${name}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { valueObject: inv.valueObjects[`${context}.${name}`] } }, flags.json);
+    }
+    if (action === 'domain-event' || action === 'event') {
+      const root = serviceRoot(this.cwd, flags);
+      const context = pascal(flags.context);
+      const event = pascal(flags.event || flags.name || subject);
+      if (!context || !event) throw new Error('ensure domain-event requires --context and --event');
+      const effects = newEffects();
+      ensureEventArtifact(root, context, event, effects);
+      const inv = loadInventory(root);
+      inv.events ??= {};
+      inv.events[`${context}.${event}`] = { context, event, path: `src/${context}/Domain/Event/${event}.ts`, status: 'skeleton' };
+      updateInventoryArchitecture(root, inv, 'domain-event.ensure', `${context}.${event}`, normalizeEffectPaths(root, effects));
+      saveInventory(root, inv);
+      effects.updated.push(inventoryPath(root));
+      return this.output({ status: 'OK', intent: 'domain-event.ensure', subject: `${context}.${event}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { event: inv.events[`${context}.${event}`] } }, flags.json);
+    }
+    if (action === 'security') {
+      const root = serviceRoot(this.cwd, flags);
+      const effects = newEffects();
+      ensureSecurity(root, effects);
+      const inv = loadInventory(root);
+      updateInventoryArchitecture(root, inv, 'security.rbac.ensure', 'Shared.Security', normalizeEffectPaths(root, effects));
+      saveInventory(root, inv);
+      effects.updated.push(inventoryPath(root));
+      return this.output({ status: 'OK', intent: 'security.rbac.ensure', subject: 'Shared.Security', effects: normalizeEffectPaths(root, effects) }, flags.json);
+    }
+    if (action === 'messaging') {
+      const root = serviceRoot(this.cwd, flags);
+      const effects = newEffects();
+      ensureMessaging(root, effects);
+      const inv = loadInventory(root);
+      updateInventoryArchitecture(root, inv, 'messaging.shared.ensure', 'Shared.Messaging', normalizeEffectPaths(root, effects));
+      saveInventory(root, inv);
+      effects.updated.push(inventoryPath(root));
+      return this.output({ status: 'OK', intent: 'messaging.shared.ensure', subject: 'Shared.Messaging', effects: normalizeEffectPaths(root, effects) }, flags.json);
+    }
+    if (action === 'testing') {
+      const root = serviceRoot(this.cwd, flags);
+      const effects = newEffects();
+      ensureTestingSuite(root, effects);
+      const inv = loadInventory(root);
+      updateInventoryArchitecture(root, inv, 'testing.suite.ensure', 'tests', normalizeEffectPaths(root, effects));
+      saveInventory(root, inv);
+      effects.updated.push(inventoryPath(root));
+      return this.output({ status: 'OK', intent: 'testing.suite.ensure', subject: 'tests', effects: normalizeEffectPaths(root, effects) }, flags.json);
+    }
     throw new Error(`Unknown ensure action: ${action}`);
   }
 
@@ -1096,6 +1659,11 @@ export class AhreCli {
     if (action === 'method') return await this.handleEnsure('method', subject, maybe, flags);
     if (action === 'entity') return await this.handleEnsure('entity', subject, maybe, flags);
     if (action === 'capability') return this.handleRecipe('apply', 'entity.capability.ensure', flags);
+    if (action === 'value-object' || action === 'vo') return await this.handleEnsure('value-object', subject, maybe, flags);
+    if (action === 'event' || action === 'domain-event') return await this.handleEnsure('domain-event', subject, maybe, flags);
+    if (action === 'consumer') return this.handleRecipe('apply', 'consumer.event.ensure', { ...flags, event: flags.event || subject });
+    if (action === 'service') return this.handleRecipe('apply', 'architecture.service.ensure', flags);
+    if (action === 'context') return this.handleRecipe('apply', 'bounded-context.ensure', { ...flags, context: flags.context || subject });
     throw new Error(`Unknown code action: ${action}`);
   }
 
@@ -1166,6 +1734,37 @@ export class AhreCli {
     if (!readGraph(root) && exists(srcRoot(root))) await buildDependencyGraph(root);
     const results = searchGraphAndInventory(root, query);
     return this.output({ status: 'OK', intent: 'search.code', query, resultCount: results.length, results }, flags.json);
+  }
+
+
+
+  handlePack(action, subject, maybe, flags) {
+    if (action === 'list' || !action) return this.output({ status: 'OK', pack: ARCHITECTURE_PACK }, flags.json);
+    if (action === 'show' || action === 'describe') {
+      return this.output({ status: 'OK', pack: ARCHITECTURE_PACK.name, version: ARCHITECTURE_PACK.version, policies: ARCHITECTURE_PACK.policies, templates: ARCHITECTURE_PACK.templates, recipes: ARCHITECTURE_PACK.recipes, intents: ARCHITECTURE_PACK.intents }, flags.json);
+    }
+    if (action === 'export') {
+      const root = serviceRoot(this.cwd, flags);
+      const to = flags.to || flags.path || '.ahre/architecture-packs';
+      const dir = path.resolve(root, to, ARCHITECTURE_PACK.name);
+      ensureDir(dir);
+      writeJson(path.join(dir, 'pack.json'), ARCHITECTURE_PACK);
+      for (const item of ARCHITECTURE_PACK.templates) writeJson(path.join(dir, 'templates', `${item.name}.json`), item);
+      for (const item of ARCHITECTURE_PACK.recipes) writeJson(path.join(dir, 'recipes', `${item.name}.json`), item);
+      for (const item of ARCHITECTURE_PACK.intents) writeJson(path.join(dir, 'intents', `${item.name}.json`), item);
+      return this.output({ status: 'OK', action: 'EXPORTED', pack: ARCHITECTURE_PACK.name, path: rel(root, dir) }, flags.json);
+    }
+    throw new Error(`Unknown pack action: ${action}`);
+  }
+
+  handleTemplate(action, subject, maybe, flags) {
+    if (action === 'list') return this.output({ status: 'OK', pack: ARCHITECTURE_PACK.name, templates: ARCHITECTURE_PACK.templates }, flags.json);
+    if (action === 'show' || action === 'describe') {
+      const template = ARCHITECTURE_PACK.templates.find((item) => item.name === subject);
+      if (!template) return this.output({ status: 'NOT_FOUND', template: subject }, flags.json);
+      return this.output({ status: 'OK', pack: ARCHITECTURE_PACK.name, template }, flags.json);
+    }
+    throw new Error(`Unknown template action: ${action}`);
   }
 
 
@@ -1243,7 +1842,7 @@ export class AhreCli {
         if (relative.includes('/Application/') && /from ['"][^'"]*(express|routing-controllers|mongodb|typeorm|redis|aws|jsonwebtoken|jwks|winston)/.test(text)) {
           issues.push({ severity: 'major', file: relative, rule: 'application-must-not-import-concrete-infrastructure' });
         }
-        if (/from ['"]\.\.\/\.\.\//.test(text)) {
+        if (/from ['"](?:\.\.\/){4,}/.test(text)) {
           issues.push({ severity: 'minor', file: relative, rule: 'possible-cross-boundary-relative-import' });
         }
       }

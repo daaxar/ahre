@@ -1,0 +1,6 @@
+{
+  "name": "di.binding.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "entity.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

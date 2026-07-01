@@ -1,0 +1,6 @@
+{
+  "name": "messaging.shared.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "document.xlsx.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "steps": [
+    "bounded-context.ensure",
+    "xlsx.exporter.ensure",
+    "testing.unit.ensure",
+    "di.binding.ensure"
+  ]
+}

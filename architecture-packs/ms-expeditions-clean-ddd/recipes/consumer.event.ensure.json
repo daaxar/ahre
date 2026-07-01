@@ -1,0 +1,11 @@
+{
+  "name": "consumer.event.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "steps": [
+    "bounded-context.ensure",
+    "consumer.ensure",
+    "testing.command.ensure",
+    "di.binding.ensure"
+  ]
+}

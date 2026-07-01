@@ -1,0 +1,18 @@
+{
+  "name": "entity.capability.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "steps": [
+    "bounded-context.ensure",
+    "entity.ensure",
+    "value-object.ensure",
+    "repository.interface.ensure",
+    "usecase.command.ensure",
+    "controller.http.ensure",
+    "repository.mongo.ensure",
+    "domain-event.ensure",
+    "testing.unit.ensure",
+    "testing.api.ensure",
+    "di.binding.ensure"
+  ]
+}

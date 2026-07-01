@@ -1,3 +1,38 @@
+# AhRE CLI v0.4.0
+
+AhRE — ArcHitecture Recipe Engine.
+
+This version adds the `ms-expeditions-clean-ddd` architecture pack derived from `ARCHITECTURE.md`: executable recipes, inspectable templates, inspectable intents and an exportable pack manifest.
+
+## Architecture pack commands
+
+```bash
+ahre pack list --json
+ahre template list --json
+ahre recipe list --json
+ahre recipe describe entity.capability.ensure --json
+```
+
+## Architecture recipes
+
+```bash
+ahre recipe plan architecture.service.ensure --service ms-expeditions --json
+ahre recipe apply architecture.service.ensure --service ms-expeditions --json
+ahre recipe apply bounded-context.ensure --context Expeditions --root servs/ms-expeditions --json
+ahre recipe apply entity.capability.ensure --entity Expedition --context Expeditions --root servs/ms-expeditions --json
+ahre recipe apply consumer.event.ensure --context Expeditions --event PackageWasScanned --usecase UpdateExpeditionsFromPackageScanned --root servs/ms-expeditions --json
+ahre recipe apply document.pdf.ensure --context Expeditions --name DeliveryNote --root servs/ms-expeditions --json
+ahre recipe apply document.xlsx.ensure --context Expeditions --name ExpeditionReport --root servs/ms-expeditions --json
+```
+
+## Micro intents
+
+```bash
+ahre ensure value-object --context Expeditions --name PackageBarcode --base StringValueObject --root servs/ms-expeditions --json
+ahre ensure domain-event --context Expeditions --event PackageWasScanned --root servs/ms-expeditions --json
+ahre ensure method --context Expeditions --entity Expedition --method owns --params "userId: string, roleGroup: string" --returns boolean --root servs/ms-expeditions --json
+```
+
 # AhRE CLI — ArcHitecture Recipe Engine
 
 AhRE is a CLI-first architecture automation engine for LLM-assisted development.

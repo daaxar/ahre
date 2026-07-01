@@ -1,0 +1,6 @@
+{
+  "name": "value-object.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

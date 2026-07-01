@@ -1,0 +1,6 @@
+{
+  "name": "controller.http.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

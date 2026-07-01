@@ -1,0 +1,10 @@
+{
+  "name": "clean-ddd-http-mongo-amqp",
+  "defaults": {
+    "transport": "http",
+    "persistence": "mongo",
+    "messaging": "domain-events",
+    "testing": "jest-cucumber",
+    "di": "yaml"
+  }
+}

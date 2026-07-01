@@ -1,0 +1,6 @@
+{
+  "name": "testing.suite.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

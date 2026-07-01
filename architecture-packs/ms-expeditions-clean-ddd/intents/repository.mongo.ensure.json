@@ -1,0 +1,6 @@
+{
+  "name": "repository.mongo.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

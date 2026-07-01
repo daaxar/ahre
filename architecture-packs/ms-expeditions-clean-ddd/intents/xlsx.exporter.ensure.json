@@ -1,0 +1,6 @@
+{
+  "name": "xlsx.exporter.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

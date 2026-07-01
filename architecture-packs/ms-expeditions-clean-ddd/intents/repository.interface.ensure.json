@@ -1,0 +1,6 @@
+{
+  "name": "repository.interface.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

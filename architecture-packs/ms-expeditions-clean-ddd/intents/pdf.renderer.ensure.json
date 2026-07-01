@@ -1,0 +1,6 @@
+{
+  "name": "pdf.renderer.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "component"
+}

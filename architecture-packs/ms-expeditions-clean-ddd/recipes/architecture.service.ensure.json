@@ -1,0 +1,13 @@
+{
+  "name": "architecture.service.ensure",
+  "idempotent": true,
+  "safeByDefault": true,
+  "steps": [
+    "service.workspace.ensure",
+    "shared.kernel.ensure",
+    "messaging.shared.ensure",
+    "security.rbac.ensure",
+    "testing.suite.ensure",
+    "runtime.docker.ensure"
+  ]
+}

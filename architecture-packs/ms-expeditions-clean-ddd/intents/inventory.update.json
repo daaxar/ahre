@@ -1,0 +1,6 @@
+{
+  "name": "inventory.update",
+  "idempotent": true,
+  "safeByDefault": true,
+  "level": "internal"
+}
