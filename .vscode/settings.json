@@ -1,0 +1,36 @@
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+
+    "**/dist": true,
+    "**/coverage": true,
+    "**/node_modules": true,
+    "**/package-lock.json": true,
+    "**/pnpm-*": true,
+    "**/.npmignore": true,
+    "**/.gitignore*": true,
+    "**/.gitpatch*": true,
+    "**/.nvmrc": true,
+    "**/.vscode": true,
+
+    "**/.github": true,
+    "**/.husky": true,
+    "**/.npmrc": true,
+    "**/.prettier*": true,
+    "**/commitlint*": true,
+    "**/lint-staged*": true,
+
+    "**/cdk.*": true,
+    "**/tsconfig.*": true,
+    "**/jest.config.*": true,
+
+    "*.md": true,
+
+    "xtools": true
+  }
+}

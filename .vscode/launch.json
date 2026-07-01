@@ -1,0 +1,38 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Adjuntar al contenedor Lambda",
+      "type": "node",
+      "request": "attach",
+      "address": "localhost",
+      "port": 9229,
+      "localRoot": "/home/diego/dev/vonzu/vonzu-io/funcs/RecurringCSV/dist/",
+      // "localRoot": "${workspaceFolder}/dist",
+      "remoteRoot": "/var/task",
+      // "protocol": "inspector",
+      "restart": true,
+      "skipFiles": ["<node_internals>/**"],
+      "timeout": 300000
+    },
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "Attach to Lambda",
+      "address": "localhost",
+      "port": 9229,
+      "restart": true,
+      "timeout": 300000
+    },
+    {
+      "type": "node-terminal",
+      "name": "deploy:preview",
+      "request": "launch",
+      "command": "npm run deploy:preview",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

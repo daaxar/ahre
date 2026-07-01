@@ -1,0 +1,26 @@
+{
+  "name": "ahre-cli",
+  "version": "0.2.0",
+  "description": "AhRE - ArcHitecture Recipe Engine CLI with recipes, AST patching, semantic inventory, and dependency graph primitives",
+  "type": "module",
+  "bin": {
+    "ahre": "./bin/ahre.mjs"
+  },
+  "scripts": {
+    "start": "node ./bin/ahre.mjs",
+    "smoke": "node ./bin/ahre.mjs intents list --json && node ./bin/ahre.mjs recipe plan entity.capability.ensure --entity User --context Users --json && node ./bin/ahre.mjs graph build --json",
+    "check": "node --check ./src/ahre-cli.mjs && node --check ./bin/ahre.mjs"
+  },
+  "keywords": [
+    "architecture",
+    "recipe-engine",
+    "cli",
+    "ddd",
+    "clean-architecture",
+    "agents"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "ts-morph": "^24.0.0"
+  }
+}
