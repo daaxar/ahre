@@ -33,42 +33,38 @@ npm install
 
 `ts-morph` is declared as a dependency. Without it, AhRE still works for many operations but reports when it falls back to conservative text patching.
 
-## Installing from GitHub Gist or GitHub raw
+## Installing with curl pipe sh
 
-AhRE ships an external bootstrap script at `scripts/install-ahre.sh`. The CLI itself is agnostic to the installer: there is no `ahre installer` command.
+AhRE ships an external bootstrap script at `scripts/install-ahre.sh`. The CLI itself is agnostic to installation: there is no `ahre installer` command.
 
-Host these files in a GitHub Gist or GitHub repository raw endpoint:
-
-```txt
-install-ahre.sh
-ahre-cli-v0.3.2.zip
-```
-
-Install with:
+The intended user experience is a single command with no extra parameters:
 
 ```bash
-curl -fsSL https://gist.githubusercontent.com/<owner>/<gist-id>/raw/install-ahre.sh \
-  | sh -s -- \
-      --dist-url https://gist.githubusercontent.com/<owner>/<gist-id>/raw/ahre-cli-v0.3.2.zip \
-      --install-skill
+curl -fsSL https://gist.githubusercontent.com/<owner>/<gist-id>/raw/install-ahre.sh | sh
 ```
 
-Default user-local installation path:
+or from GitHub raw:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<ref>/scripts/install-ahre.sh | sh
+```
+
+Before publishing the installer, embed the AhRE source URL inside the script by setting `AHRE_SOURCE_URL` to either a raw ZIP URL or a Git repository URL.
+
+Default user-local global installation path:
 
 ```txt
 $HOME/.local/.ahre
 $HOME/.local/bin/ahre
 ```
 
-The same installer also works from GitHub raw URLs:
+The installer also installs the user-facing AhRE usage skill globally by default:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<ref>/install-ahre.sh \
-  | sh -s -- \
-      --dist-url https://raw.githubusercontent.com/<owner>/<repo>/<ref>/ahre-cli-v0.3.2.zip
+```txt
+$HOME/.ahre/skills/ahre-usage/SKILL.md
 ```
 
-See `docs/INSTALL_FROM_RAW.md` for details.
+See `docs/INSTALL_FROM_RAW.md` for publishing details.
 
 ## Basic commands
 
@@ -287,4 +283,4 @@ Execution preference for models:
 
 ## Version
 
-Current version: `0.3.2`.
+Current version: `0.3.3`.

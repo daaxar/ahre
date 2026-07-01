@@ -1,57 +1,64 @@
-# Installing AhRE from GitHub Gist or GitHub raw
+# Install AhRE with curl pipe sh
 
-AhRE is installed by a small external shell script. The CLI is intentionally agnostic to the installer and does not expose installer commands.
-
-## Files to host
-
-Host both files in a GitHub Gist or in a repository reachable through raw GitHub URLs:
-
-```txt
-install-ahre.sh
-ahre-cli-v0.3.2.zip
-```
-
-## Install from GitHub Gist raw
+AhRE should be installable with a single command:
 
 ```bash
-curl -fsSL https://gist.githubusercontent.com/<owner>/<gist-id>/raw/install-ahre.sh \
-  | sh -s -- \
-      --dist-url https://gist.githubusercontent.com/<owner>/<gist-id>/raw/ahre-cli-v0.3.2.zip \
-      --install-skill
+curl -fsSL <raw-install-ahre.sh> | sh
 ```
 
-## Install from GitHub raw
+The installer is intentionally external to the CLI. AhRE itself does not expose installer commands.
+
+## Publishing the installer
+
+Before publishing `scripts/install-ahre.sh`, replace the embedded `AHRE_SOURCE_URL` value with either:
+
+1. a raw ZIP URL, for example a GitHub Gist raw URL or GitHub raw/release asset; or
+2. a Git repository URL that can be cloned.
+
+Example embedded source values:
+
+```sh
+AHRE_SOURCE_URL="${AHRE_SOURCE_URL:-https://gist.githubusercontent.com/<owner>/<gist-id>/raw/ahre-cli-v0.3.3.zip}"
+```
+
+or:
+
+```sh
+AHRE_SOURCE_URL="${AHRE_SOURCE_URL:-https://github.com/<owner>/<repo>.git}"
+```
+
+Once the URL is embedded, users install with no extra parameters:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<ref>/install-ahre.sh \
-  | sh -s -- \
-      --dist-url https://raw.githubusercontent.com/<owner>/<repo>/<ref>/ahre-cli-v0.3.2.zip \
-      --install-skill
+curl -fsSL https://gist.githubusercontent.com/<owner>/<gist-id>/raw/install-ahre.sh | sh
 ```
 
-## Defaults
+## Default installation paths
 
-The installer uses user-local global paths by default:
+The installer always uses user-local global paths by default:
 
 ```txt
 $HOME/.local/.ahre
 $HOME/.local/bin/ahre
 ```
 
-It creates a wrapper at `$HOME/.local/bin/ahre` pointing to `$HOME/.local/.ahre/bin/ahre.mjs`.
+It also installs the user-facing AhRE usage skill globally by default:
 
-If `$HOME/.local/bin` is not on PATH, the installer prints the shell export to add.
-
-## Options
-
-```bash
---dist-url <url>       AhRE ZIP distribution URL. Can also be AHRE_DIST_URL.
---install-dir <dir>    Install directory. Default: $HOME/.local/.ahre
---bin-dir <dir>        Wrapper directory. Default: $HOME/.local/bin
---install-skill        Also install the AhRE usage SKILL globally.
---skip-deps            Skip npm install --omit=dev.
+```txt
+$HOME/.ahre/skills/ahre-usage/SKILL.md
+$HOME/.ahre/skills/manifest.json
 ```
 
-## Design note
+Set `AHRE_INSTALL_SKILL=0` only if you explicitly want to skip global skill installation.
 
-The installer belongs to distribution. AhRE CLI remains focused on architecture recipes, code intents, inventory, graph, build planning, search, verification, and SKILL installation.
+## Environment overrides for maintainers
+
+Normal users should not need these. They are useful for CI or local tests:
+
+```bash
+AHRE_SOURCE_URL=file:///tmp/ahre-cli-v0.3.3.zip sh scripts/install-ahre.sh
+AHRE_INSTALL_DIR=/tmp/ahre AHRE_BIN_DIR=/tmp/bin AHRE_SOURCE_URL=file:///tmp/ahre-cli-v0.3.3.zip sh scripts/install-ahre.sh
+AHRE_SKIP_DEPS=1 AHRE_SOURCE_URL=file:///tmp/ahre-cli-v0.3.3.zip sh scripts/install-ahre.sh
+```
+
+No CLI arguments are required or documented as the normal path.

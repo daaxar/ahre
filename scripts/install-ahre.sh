@@ -1,161 +1,148 @@
 #!/usr/bin/env sh
 set -eu
 
-# AhRE user-local installer bootstrap.
-# Host this file as GitHub Gist raw or GitHub raw content, then run:
-#   curl -fsSL <raw-install-ahre.sh> | sh -s -- --dist-url <raw-ahre-cli.zip> --install-skill
+# AhRE one-command installer.
 #
-# Defaults:
-#   install dir: $HOME/.local/.ahre
-#   bin dir:     $HOME/.local/bin
+# Intended usage after publishing this script with an embedded source URL:
+#   curl -fsSL <raw-install-ahre.sh> | sh
 #
-# The AhRE CLI is intentionally agnostic to this installer.
+# Before publishing, set AHRE_SOURCE_URL below to either:
+#   - a raw ZIP URL, for example a GitHub Gist raw file or GitHub raw/release asset
+#   - a Git repository URL that can be cloned
+#
+# Optional environment overrides are supported for maintainers/CI, but normal users
+# should not need arguments or flags.
 
-AHRE_VERSION="0.3.2"
-AHRE_DIST_URL="${AHRE_DIST_URL:-}"
+AHRE_VERSION="0.3.3"
+
+# Replace this value in the published installer. Keeping it as a variable makes
+# the CLI distribution agnostic to where the installer is hosted.
+AHRE_SOURCE_URL="${AHRE_SOURCE_URL:-__AHRE_SOURCE_URL__}"
+
+# Default user-global install locations.
 AHRE_INSTALL_DIR="${AHRE_INSTALL_DIR:-$HOME/.local/.ahre}"
 AHRE_BIN_DIR="${AHRE_BIN_DIR:-$HOME/.local/bin}"
-AHRE_INSTALL_SKILL="0"
-AHRE_SKIP_DEPS="0"
+AHRE_BIN_PATH="$AHRE_BIN_DIR/ahre"
 
-usage() {
-  cat <<USAGE
-AhRE installer $AHRE_VERSION
+# Install the user-facing AhRE skill globally by default. Set AHRE_INSTALL_SKILL=0
+# to skip when testing the installer.
+AHRE_INSTALL_SKILL="${AHRE_INSTALL_SKILL:-1}"
 
-Usage:
-  install-ahre.sh --dist-url <zip-url> [options]
+# Set AHRE_SKIP_DEPS=1 only for local tests where dependencies are already known
+# to be unavailable or unnecessary.
+AHRE_SKIP_DEPS="${AHRE_SKIP_DEPS:-0}"
 
-Options:
-  --dist-url <url>       AhRE ZIP distribution URL. Can also be AHRE_DIST_URL.
-  --install-dir <dir>    Install directory. Default: \$HOME/.local/.ahre
-  --bin-dir <dir>        Wrapper directory. Default: \$HOME/.local/bin
-  --install-skill        Also install AhRE usage SKILL globally after CLI installation.
-  --skip-deps            Skip npm install --omit=dev.
-  -h, --help             Show help.
-
-Examples:
-  curl -fsSL <gist-or-github-raw-install-url> | sh -s -- --dist-url <gist-or-github-raw-zip-url> --install-skill
-  AHRE_DIST_URL=<zip-url> sh install-ahre.sh --install-skill
-USAGE
-}
-
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --dist-url)
-      AHRE_DIST_URL="$2"; shift 2 ;;
-    --install-dir)
-      AHRE_INSTALL_DIR="$2"; shift 2 ;;
-    --bin-dir)
-      AHRE_BIN_DIR="$2"; shift 2 ;;
-    --install-skill)
-      AHRE_INSTALL_SKILL="1"; shift ;;
-    --skip-deps)
-      AHRE_SKIP_DEPS="1"; shift ;;
-    -h|--help)
-      usage; exit 0 ;;
-    *)
-      echo "Unknown option: $1" >&2
-      usage >&2
-      exit 2 ;;
-  esac
-done
-
-if [ -z "$AHRE_DIST_URL" ]; then
-  echo "AHRE_DIST_URL is required. Pass --dist-url <zip-url>." >&2
-  exit 2
-fi
+info() { printf '%s\n' "$*" >&2; }
+fail() { printf 'AhRE installer error: %s\n' "$*" >&2; exit 1; }
 
 need() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "Missing required command: $1" >&2
-    exit 1
+  command -v "$1" >/dev/null 2>&1 || fail "missing required command: $1"
+}
+
+fetch_to_file() {
+  url="$1"
+  dest="$2"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" -o "$dest"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$dest" "$url"
+  else
+    fail "missing required command: curl or wget"
   fi
 }
 
+if [ "$AHRE_SOURCE_URL" = "__AHRE_SOURCE_URL__" ] || [ -z "$AHRE_SOURCE_URL" ]; then
+  cat >&2 <<MSG
+AhRE installer has no embedded source URL.
+
+Publish a copy of scripts/install-ahre.sh with AHRE_SOURCE_URL set to a raw ZIP
+URL or a Git repository URL. Then users can install with:
+
+  curl -fsSL <raw-install-ahre.sh> | sh
+
+For local testing only, you may run:
+
+  AHRE_SOURCE_URL=file:///path/to/ahre-cli-v$AHRE_VERSION.zip sh scripts/install-ahre.sh
+MSG
+  exit 2
+fi
+
 need node
 need npm
-need unzip
-
-if command -v curl >/dev/null 2>&1; then
-  FETCH="curl -fsSL"
-elif command -v wget >/dev/null 2>&1; then
-  FETCH="wget -qO-"
-else
-  echo "Missing required command: curl or wget" >&2
-  exit 1
-fi
 
 TMP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t ahre)"
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT INT TERM
 
-ZIP_FILE="$TMP_DIR/ahre-cli.zip"
-echo "Downloading AhRE from $AHRE_DIST_URL" >&2
-# shellcheck disable=SC2086
-$FETCH "$AHRE_DIST_URL" > "$ZIP_FILE"
-
-UNPACK_DIR="$TMP_DIR/unpack"
-mkdir -p "$UNPACK_DIR"
-unzip -q "$ZIP_FILE" -d "$UNPACK_DIR"
-
 PKG_DIR=""
-for candidate in "$UNPACK_DIR"/* "$UNPACK_DIR"/*/*; do
-  if [ -f "$candidate/package.json" ] && [ -f "$candidate/bin/ahre.mjs" ]; then
-    PKG_DIR="$candidate"
-    break
-  fi
-done
+case "$AHRE_SOURCE_URL" in
+  *.zip|*.zip\?*|file://*.zip)
+    need unzip
+    ZIP_FILE="$TMP_DIR/ahre-cli.zip"
+    info "Downloading AhRE $AHRE_VERSION from ZIP source"
+    fetch_to_file "$AHRE_SOURCE_URL" "$ZIP_FILE"
+    UNPACK_DIR="$TMP_DIR/unpack"
+    mkdir -p "$UNPACK_DIR"
+    unzip -q "$ZIP_FILE" -d "$UNPACK_DIR"
+    for candidate in "$UNPACK_DIR"/* "$UNPACK_DIR"/*/*; do
+      if [ -f "$candidate/package.json" ] && [ -f "$candidate/bin/ahre.mjs" ]; then
+        PKG_DIR="$candidate"
+        break
+      fi
+    done
+    ;;
+  *)
+    need git
+    info "Cloning AhRE $AHRE_VERSION from Git source"
+    git clone --depth 1 "$AHRE_SOURCE_URL" "$TMP_DIR/repo" >/dev/null 2>&1 || fail "git clone failed"
+    if [ -f "$TMP_DIR/repo/package.json" ] && [ -f "$TMP_DIR/repo/bin/ahre.mjs" ]; then
+      PKG_DIR="$TMP_DIR/repo"
+    elif [ -f "$TMP_DIR/repo/ahre-cli/package.json" ] && [ -f "$TMP_DIR/repo/ahre-cli/bin/ahre.mjs" ]; then
+      PKG_DIR="$TMP_DIR/repo/ahre-cli"
+    fi
+    ;;
+esac
 
-if [ -z "$PKG_DIR" ]; then
-  echo "Could not find AhRE package inside ZIP." >&2
-  exit 1
-fi
+[ -n "$PKG_DIR" ] || fail "could not locate AhRE package in source"
 
-echo "Installing AhRE into $AHRE_INSTALL_DIR" >&2
+info "Installing AhRE into $AHRE_INSTALL_DIR"
 rm -rf "$AHRE_INSTALL_DIR"
 mkdir -p "$(dirname "$AHRE_INSTALL_DIR")"
 cp -R "$PKG_DIR" "$AHRE_INSTALL_DIR"
 
 if [ "$AHRE_SKIP_DEPS" != "1" ]; then
-  echo "Installing AhRE runtime dependencies" >&2
+  info "Installing runtime dependencies"
   (cd "$AHRE_INSTALL_DIR" && npm install --omit=dev --silent)
 fi
 
 mkdir -p "$AHRE_BIN_DIR"
-WRAPPER="$AHRE_BIN_DIR/ahre"
-cat > "$WRAPPER" <<WRAPPER_EOF
+cat > "$AHRE_BIN_PATH" <<WRAPPER
 #!/usr/bin/env sh
 exec node "$AHRE_INSTALL_DIR/bin/ahre.mjs" "\$@"
-WRAPPER_EOF
-chmod +x "$WRAPPER"
+WRAPPER
+chmod +x "$AHRE_BIN_PATH"
 
-AHRE_CMD="$WRAPPER"
-if command -v ahre >/dev/null 2>&1; then
-  AHRE_CMD="ahre"
-else
-  echo "AhRE was installed, but '$AHRE_BIN_DIR' may not be on PATH yet." >&2
-  echo "Add this to your shell profile if needed:" >&2
-  echo "  export PATH=\"$AHRE_BIN_DIR:\$PATH\"" >&2
-fi
-
-echo "Verifying AhRE" >&2
-$AHRE_CMD --version --json >/dev/null
+info "Verifying AhRE"
+"$AHRE_BIN_PATH" --version --json >/dev/null
 
 if [ "$AHRE_INSTALL_SKILL" = "1" ]; then
-  echo "Installing AhRE usage SKILL globally" >&2
-  $AHRE_CMD skill install usage --target global --json >/dev/null
+  info "Installing AhRE usage skill globally"
+  "$AHRE_BIN_PATH" skill install usage --target global --json >/dev/null || info "Could not install global skill; CLI installation still completed"
 fi
 
 cat <<DONE
-AhRE installed successfully.
+AhRE $AHRE_VERSION installed successfully.
+
+CLI:
+  $AHRE_BIN_PATH
 
 Install dir:
   $AHRE_INSTALL_DIR
 
-Command:
-  $AHRE_CMD
+Try:
+  ahre --version --json
+  ahre skill doctor --target global --json
 
-Check:
-  $AHRE_CMD --version --json
-  $AHRE_CMD skill doctor --target global --json
+If 'ahre' is not found, add this to your shell profile:
+  export PATH="$AHRE_BIN_DIR:\$PATH"
 DONE
