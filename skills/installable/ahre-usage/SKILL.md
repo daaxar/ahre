@@ -1,132 +1,38 @@
 ---
-name: "ahre-usage"
-description: "Use AhRE as the mandatory first execution path for architecture/code recipes, code intents, inventory queries, dependency graph analysis, search, verification, and build planning."
+name: "AhRE Usage"
+description: "Mandatory entrypoint for agents using AhRE before creating or modifying architecture/code artifacts. Routes to generation, context, and quality skills."
 ---
 
-# AhRE Usage Skill
+# AhRE Usage
 
-## Use when
+Use this skill before creating, modifying, wiring, searching, verifying, or planning code/architecture artifacts.
 
-Use AhRE when a task involves creating, modifying, inspecting, wiring, searching, verifying, planning, or scaffolding architecture/code artifacts.
+AhRE is deterministic. It creates files, updates indexes, exposes slots, runs checks, and reports diagnostics. The LLM decides architecture intent and business logic.
 
-AhRE is the mandatory first execution path for architecture/code work. Manual file creation is a fallback, not the default.
+## Mandatory rule
 
-## First rule
+Before writing code manually, try AhRE first.
 
-Before manually creating or modifying architecture/code artifacts, you MUST try to use AhRE.
+Do not manually scaffold bounded contexts, entities, value objects, repositories, use cases, controllers, consumers, events, tests, DI bindings, runtime files, or architecture folders when AhRE has an applicable intent or recipe.
 
-This includes:
+## Load only the smallest extra skill
 
-- bounded contexts
-- entities/aggregates
-- value objects
-- repository interfaces
-- repository implementations
-- use cases
-- controllers
-- consumers
-- domain events
-- tests
-- DI bindings
-- runtime/config skeletons
-- architecture folders
+Do not load every AhRE skill by default.
 
-## Execution preference
+- For generation or modification, read `.agents/ahre-generation/SKILL.md`.
+- For locating artifacts, slots, tasks, inventory, index, or graph without reading files, read `.agents/ahre-context/SKILL.md`.
+- For format, lint, typecheck, tests, coverage, diagnostics, or skipped checks, read `.agents/ahre-quality/SKILL.md`.
 
-1. Use AhRE MCP tools when available.
-2. If MCP is unavailable, use the `ahre` CLI with `--json`.
-3. If AhRE is unavailable, implement manually using the project architecture skills and report that AhRE was unavailable.
-
-## Mandatory CLI workflow
-
-For any non-trivial code or architecture task:
-
-1. Search available intents before guessing commands.
-2. Describe the selected intent if the inputs or effects are unclear.
-3. Run `plan` before `apply` for macro recipes.
-4. Apply only when the plan has no blockers or destructive surprises.
-5. Read `inventoryDelta` and `currentKnowledge` after applying.
-6. Continue from inventory/graph context instead of rereading large files whenever possible.
-7. Run verification before final delivery.
+## Minimal workflow
 
 ```bash
 ahre intents search "<task>" --json
-ahre intents describe <intent> --json
 ahre recipe plan <recipe> --json
 ahre recipe apply <recipe> --json
-ahre inventory get <kind> <id> --json
-ahre graph build --json
-ahre verify architecture --json
 ```
 
-## Common examples
+After any mutating AhRE command, inspect the returned `quality` report. AhRE runs default post-action static checks automatically.
 
-```bash
-ahre intents search "entity create http mongo" --json
-ahre intents describe entity.capability.ensure --json
-ahre recipe plan entity.capability.ensure --entity User --context Users --json
-ahre recipe apply entity.capability.ensure --entity User --context Users --json
-ahre inventory get entity Users.User --json
-ahre build plan --changed src/Users/Domain/Model/User.ts --json
-ahre search code User --json
-ahre verify architecture --json
-```
+Do not inspect generated files first. Use returned `logicSlots`, `currentKnowledge`, `tasks`, `graph`, and `quality` before reading files.
 
-## Macro versus micro
-
-Use macro recipes for complete architecture capabilities:
-
-```bash
-ahre recipe plan entity.capability.ensure --entity User --context Users --json
-ahre recipe apply entity.capability.ensure --entity User --context Users --json
-```
-
-Use micro-intents for surgical edits:
-
-```bash
-ahre ensure method --entity User --context Users --method changeEmail --json
-ahre ensure value-object --context Users --name UserEmail --json
-```
-
-## Manual work policy
-
-Manual implementation is allowed only when:
-
-- AhRE is unavailable.
-- AhRE returns `BLOCKED`.
-- No applicable recipe or intent exists.
-- The remaining work is business-specific logic that AhRE intentionally leaves as TODO.
-
-When falling back to manual work, state why AhRE was not used.
-
-## Rules
-
-- Do not manually scaffold boilerplate when AhRE has an applicable recipe or intent.
-- Prefer `ensure` semantics over `create` semantics.
-- Treat AhRE inventory as a regenerable semantic cache; source code remains the source of truth.
-- Use `graph build`, `inventory get`, and `search code` to give the LLM compact context.
-- Do not author AhRE internals by default.
-- Do not create or modify AhRE recipes, templates, intents, inventory schemas, architecture packs, or MCP tools unless the user explicitly asks to extend AhRE itself.
-
-## Stop conditions
-
-Stop and ask when:
-
-- AhRE returns `BLOCKED`.
-- A plan shows destructive changes.
-- Business rules, schemas, security, persistence behavior, or public contracts are ambiguous.
-- The requested shortcut violates architecture boundaries.
-
-## Output handling
-
-Use these fields from AhRE JSON responses:
-
-- `status`
-- `effects`
-- `inventoryDelta`
-- `currentKnowledge`
-- `warnings`
-- `blocked`
-- `nextSuggestedIntents`
-
-Summarize what AhRE did instead of pasting generated files.
+Manual implementation is allowed only when AhRE is unavailable, returns `BLOCKED`, has no applicable intent/recipe, or business-specific logic intentionally remains for the LLM.

@@ -1,7 +1,7 @@
 {
   "name": "ahre-cli",
-  "version": "0.4.1",
-  "description": "AhRE - ArcHitecture Recipe Engine CLI with mandatory .agents skill bootstrap, recipes, AST patching, architecture packs, semantic inventory, graph, search, and build planning",
+  "version": "0.6.0",
+  "description": "AhRE - ArcHitecture Recipe Engine CLI with mandatory .agents skill bootstrap, deterministic recipes, logic slots, semantic inventory, graph, search, and build planning",
   "type": "module",
   "bin": {
     "ahre": "./bin/ahre.mjs"

@@ -3,8 +3,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 
-const VERSION = '0.4.1';
+const VERSION = '0.6.0';
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const INTENTS = [
@@ -103,6 +104,48 @@ const INTENTS = [
     name: 'skill.show',
     kind: 'llm-integration',
     description: 'Show bundled AhRE usage or authoring SKILL content. Authoring skills are not installed by default.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'slot.list',
+    kind: 'llm-context',
+    description: 'List deterministic AHRE_SLOT insertion points created by recipes so agents know where business-specific logic belongs without reading generated files.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'slot.get',
+    kind: 'llm-context',
+    description: 'Get one deterministic logic slot with exact file, class, method, marker, purpose, and layer.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'code.insert-slot',
+    kind: 'micro-intent',
+    description: 'Insert or replace provided content inside an existing AHRE_SLOT marker. AhRE does not decide the business logic; it only places supplied content deterministically.',
+    idempotent: false,
+    safeByDefault: true
+  },
+  {
+    name: 'task.list',
+    kind: 'llm-context',
+    description: 'List deterministic recipe tasks and manual-available work items produced by AhRE recipes.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'quality.run',
+    kind: 'post-mutation-feedback',
+    description: 'Run deterministic post-action quality checks: format, lint, typecheck, architecture, slot integrity, tests/coverage according to mode.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'quality.static',
+    kind: 'post-mutation-feedback',
+    description: 'Run static checks only: formatter, lint, typecheck, architecture, import rules and slot integrity.',
     idempotent: true,
     safeByDefault: true
   }
@@ -372,6 +415,8 @@ function emptyInventory(root) {
     entities: {},
     artifacts: {},
     todos: {},
+    slots: {},
+    tasks: {},
     operations: []
   };
 }
@@ -384,6 +429,8 @@ function loadInventory(root) {
   inv.entities ??= {};
   inv.artifacts ??= {};
   inv.todos ??= {};
+  inv.slots ??= {};
+  inv.tasks ??= {};
   inv.operations ??= [];
   return inv;
 }
@@ -411,8 +458,44 @@ function contextDirs(root, context) {
   };
 }
 
-function templateAggregate({ entity }) {
-  return `import { AggregateRoot } from '../../../Shared/Domain/AggregateRoot';\nimport { ${entity}Id } from '../ValueObject/${entity}Id';\n\nexport class ${entity} extends AggregateRoot {\n  private constructor(private readonly id: ${entity}Id) {\n    super();\n  }\n\n  public static create(id: ${entity}Id): ${entity} {\n    const ${camel(entity)} = new ${entity}(id);\n    // ARCH_TODO[kind=domain-invariant artifact=${entity}.create] Define creation invariants.\n    return ${camel(entity)};\n  }\n\n  public getId(): ${entity}Id {\n    return this.id;\n  }\n\n  public toPrimitives(): { id: string } {\n    return { id: this.id.value };\n  }\n}\n`;
+function slotComment({ id, purpose, indent = '    ' }) {
+  return `${indent}// AHRE_SLOT_START:${id}
+${indent}// ${purpose}
+${indent}// AHRE_SLOT_END:${id}`;
+}
+
+function templateAggregate({ context, entity }) {
+  const domainRules = `${context}.${entity}.create.domainRules`;
+  const events = `${context}.${entity}.create.domainEvents`;
+  return `import { AggregateRoot } from '../../../Shared/Domain/AggregateRoot';
+import { ${entity}Id } from '../ValueObject/${entity}Id';
+import { ${entity}WasCreated } from '../Event/${entity}WasCreated';
+
+export class ${entity} extends AggregateRoot {
+  private constructor(private readonly id: ${entity}Id) {
+    super();
+  }
+
+  public static create(id: ${entity}Id): ${entity} {
+${slotComment({ id: domainRules, purpose: 'Put aggregate creation invariants here.' })}
+
+    const ${camel(entity)} = new ${entity}(id);
+
+${slotComment({ id: events, purpose: 'Put domain event recording conditions here.' })}
+    ${camel(entity)}.record(new ${entity}WasCreated(id.value));
+
+    return ${camel(entity)};
+  }
+
+  public getId(): ${entity}Id {
+    return this.id;
+  }
+
+  public toPrimitives(): { id: string } {
+    return { id: this.id.value };
+  }
+}
+`;
 }
 
 function templateAggregateRoot() {
@@ -431,29 +514,222 @@ function templateRepositoryInterface({ entity }) {
   return `import { ${entity} } from '../Model/${entity}';\nimport { ${entity}Id } from '../ValueObject/${entity}Id';\n\nexport interface ${entity}Repository {\n  save(${camel(entity)}: ${entity}): Promise<void>;\n  search(id: ${entity}Id): Promise<${entity} | null>;\n}\n`;
 }
 
-function templateUseCase({ entity }) {
-  return `import { ${entity} } from '../../../Domain/Model/${entity}';\nimport { ${entity}Repository } from '../../../Domain/Repository/${entity}Repository';\nimport { ${entity}Id } from '../../../Domain/ValueObject/${entity}Id';\n\nexport interface Create${entity}Request {\n  id: string;\n}\n\nexport class Create${entity} {\n  public constructor(private readonly repository: ${entity}Repository) {}\n\n  public async run(request: Create${entity}Request): Promise<void> {\n    const ${camel(entity)} = ${entity}.create(new ${entity}Id(request.id));\n    await this.repository.save(${camel(entity)});\n  }\n}\n`;
+function templateUseCase({ context, entity }) {
+  const inputMapping = `${context}.Create${entity}.run.inputMapping`;
+  const orchestration = `${context}.Create${entity}.run.orchestration`;
+  const persistence = `${context}.Create${entity}.run.persistence`;
+  const events = `${context}.Create${entity}.run.events`;
+  return `import { ${entity} } from '../../../Domain/Model/${entity}';
+import { ${entity}Repository } from '../../../Domain/Repository/${entity}Repository';
+import { ${entity}Id } from '../../../Domain/ValueObject/${entity}Id';
+
+export interface Create${entity}Request {
+  id: string;
+}
+
+export interface MessageBus {
+  publish(events: unknown[]): Promise<void>;
+}
+
+export class Create${entity} {
+  public constructor(
+    private readonly repository: ${entity}Repository,
+    private readonly messageBus?: MessageBus
+  ) {}
+
+  public async run(request: Create${entity}Request): Promise<void> {
+${slotComment({ id: inputMapping, purpose: 'Put request-to-value-object mapping here.' })}
+    const id = new ${entity}Id(request.id);
+
+${slotComment({ id: orchestration, purpose: 'Put application orchestration here: repository checks, aggregate creation, policies requiring ports.' })}
+    const ${camel(entity)} = ${entity}.create(id);
+
+${slotComment({ id: persistence, purpose: 'Put persistence orchestration here.' })}
+    await this.repository.save(${camel(entity)});
+
+${slotComment({ id: events, purpose: 'Put domain event publication orchestration here.' })}
+    if (this.messageBus) await this.messageBus.publish(${camel(entity)}.pullDomainEvents());
+  }
+}
+`;
 }
 
 function templateController({ entity, context }) {
   const route = kebab(entity) + 's';
-  return `import { Body, JsonController, Post } from 'routing-controllers';\nimport { IsUUID } from 'class-validator';\nimport { Create${entity} } from '../../../Application/UseCase/Create${entity}/Create${entity}';\n\nclass Create${entity}Body {\n  @IsUUID()\n  id!: string;\n}\n\n@JsonController('/${route}')\nexport class ${entity}Controller {\n  public constructor(private readonly create${entity}: Create${entity}) {}\n\n  @Post('/')\n  public async create(@Body() body: Create${entity}Body): Promise<{ status: 'ok' }> {\n    await this.create${entity}.run(body);\n    return { status: 'ok' };\n  }\n}\n`;
+  const dtoShape = `${context}.${entity}Controller.create.dtoShape`;
+  const mapping = `${context}.${entity}Controller.create.transportMapping`;
+  return `import { Body, JsonController, Post } from 'routing-controllers';
+import { IsUUID } from 'class-validator';
+import { Create${entity} } from '../../../Application/UseCase/Create${entity}/Create${entity}';
+
+class Create${entity}Body {
+${slotComment({ id: dtoShape, purpose: 'Put HTTP DTO shape validation fields here.', indent: '  ' })}
+  @IsUUID()
+  id!: string;
 }
 
-function templateMongoRepository({ entity }) {
-  return `import { ${entity} } from '../../Domain/Model/${entity}';\nimport { ${entity}Repository } from '../../Domain/Repository/${entity}Repository';\nimport { ${entity}Id } from '../../Domain/ValueObject/${entity}Id';\n\nexport class Mongo${entity}Repository implements ${entity}Repository {\n  public async save(${camel(entity)}: ${entity}): Promise<void> {\n    // ARCH_TODO[kind=persistence artifact=Mongo${entity}Repository.save] Wire Mongo collection and mapper.\n    void ${camel(entity)};\n  }\n\n  public async search(id: ${entity}Id): Promise<${entity} | null> {\n    // ARCH_TODO[kind=persistence artifact=Mongo${entity}Repository.search] Implement Mongo query and rehydration.\n    void id;\n    return null;\n  }\n}\n`;
+@JsonController('/${route}')
+export class ${entity}Controller {
+  public constructor(private readonly create${entity}: Create${entity}) {}
+
+  @Post('/')
+  public async create(@Body() body: Create${entity}Body): Promise<{ status: 'ok' }> {
+${slotComment({ id: mapping, purpose: 'Put HTTP request-to-command mapping here.' })}
+    await this.create${entity}.run({
+      id: body.id
+    });
+    return { status: 'ok' };
+  }
+}
+`;
+}
+
+function templateMongoRepository({ context, entity }) {
+  const saveMapping = `${context}.Mongo${entity}Repository.save.mapping`;
+  const searchMapping = `${context}.Mongo${entity}Repository.search.mapping`;
+  return `import { ${entity} } from '../../Domain/Model/${entity}';
+import { ${entity}Repository } from '../../Domain/Repository/${entity}Repository';
+import { ${entity}Id } from '../../Domain/ValueObject/${entity}Id';
+
+export class Mongo${entity}Repository implements ${entity}Repository {
+  public async save(${camel(entity)}: ${entity}): Promise<void> {
+${slotComment({ id: saveMapping, purpose: 'Put Mongo persistence mapping for save here.' })}
+    void ${camel(entity)};
+  }
+
+  public async search(id: ${entity}Id): Promise<${entity} | null> {
+${slotComment({ id: searchMapping, purpose: 'Put Mongo query and rehydration mapping here.' })}
+    void id;
+    return null;
+  }
+}
+`;
 }
 
 function templateEvent({ entity }) {
   return `export class ${entity}WasCreated {\n  public constructor(\n    public readonly aggregateId: string,\n    public readonly occurredOn: string = new Date().toISOString()\n  ) {}\n}\n`;
 }
 
-function templateUseCaseTest({ entity }) {
-  return `import { Create${entity} } from '../../../../../src/{{context}}/Application/UseCase/Create${entity}/Create${entity}';\n\ndescribe('Create${entity}', () => {\n  it('creates a ${entity}', async () => {\n    const repository = { save: jest.fn(), search: jest.fn() };\n    const useCase = new Create${entity}(repository);\n\n    await useCase.run({ id: '00000000-0000-4000-8000-000000000000' });\n\n    expect(repository.save).toHaveBeenCalledTimes(1);\n  });\n});\n`;
+function templateUseCaseTest({ context, entity }) {
+  return `import { Create${entity} } from '../../../../../src/${context}/Application/UseCase/Create${entity}/Create${entity}';
+
+describe('Create${entity}', () => {
+  it('creates a ${entity}', async () => {
+    const repository = { save: jest.fn(), search: jest.fn() };
+    const useCase = new Create${entity}(repository);
+
+    await useCase.run({ id: '00000000-0000-4000-8000-000000000000' });
+
+    // AHRE_SLOT_START:${context}.Create${entity}.test.behavior
+    expect(repository.save).toHaveBeenCalledTimes(1);
+    // AHRE_SLOT_END:${context}.Create${entity}.test.behavior
+  });
+});
+`;
 }
 
-function templateApiFeature({ entity }) {
-  return `Feature: Create ${entity}\n\n  Scenario: Create a valid ${entity}\n    Given I am an authenticated user\n    When I send a POST request to /${kebab(entity)}s with a valid payload\n    Then the response status should be 200\n`;
+function templateApiFeature({ context, entity }) {
+  return `Feature: Create ${entity}
+
+  # AHRE_SLOT_START:${context}.${entity}.apiFeature.createScenario
+  Scenario: Create a valid ${entity}
+    Given I am an authenticated user
+    When I send a POST request to /${kebab(entity)}s with a valid payload
+    Then the response status should be 200
+  # AHRE_SLOT_END:${context}.${entity}.apiFeature.createScenario
+`;
+}
+
+
+function entityLogicSlots({ root, context, entity }) {
+  const dirs = contextDirs(root, context);
+  const make = ({ id, kind, layer, file, className, method, purpose, writeMode = 'manual-or-code-insert-slot' }) => ({
+    id,
+    kind,
+    layer,
+    path: rel(root, file),
+    class: className,
+    method,
+    markerStart: `AHRE_SLOT_START:${id}`,
+    markerEnd: `AHRE_SLOT_END:${id}`,
+    purpose,
+    writeMode
+  });
+  return [
+    make({ id: `${context}.${entity}.create.domainRules`, kind: 'domain-rules', layer: 'Domain', file: path.join(dirs.model, `${entity}.ts`), className: entity, method: 'create', purpose: 'Put aggregate creation invariants here.' }),
+    make({ id: `${context}.${entity}.create.domainEvents`, kind: 'domain-events', layer: 'Domain', file: path.join(dirs.model, `${entity}.ts`), className: entity, method: 'create', purpose: 'Put domain event recording conditions here.' }),
+    make({ id: `${context}.Create${entity}.run.inputMapping`, kind: 'input-mapping', layer: 'Application', file: path.join(dirs.useCase, `Create${entity}`, `Create${entity}.ts`), className: `Create${entity}`, method: 'run', purpose: 'Put request-to-value-object mapping here.' }),
+    make({ id: `${context}.Create${entity}.run.orchestration`, kind: 'application-orchestration', layer: 'Application', file: path.join(dirs.useCase, `Create${entity}`, `Create${entity}.ts`), className: `Create${entity}`, method: 'run', purpose: 'Put application orchestration here: repository checks, aggregate creation, policies requiring ports.' }),
+    make({ id: `${context}.Create${entity}.run.persistence`, kind: 'persistence-orchestration', layer: 'Application', file: path.join(dirs.useCase, `Create${entity}`, `Create${entity}.ts`), className: `Create${entity}`, method: 'run', purpose: 'Put persistence orchestration here.' }),
+    make({ id: `${context}.Create${entity}.run.events`, kind: 'event-publication', layer: 'Application', file: path.join(dirs.useCase, `Create${entity}`, `Create${entity}.ts`), className: `Create${entity}`, method: 'run', purpose: 'Put domain event publication orchestration here.' }),
+    make({ id: `${context}.${entity}Controller.create.dtoShape`, kind: 'transport-validation', layer: 'Infrastructure', file: path.join(dirs.controller, `${entity}Controller.ts`), className: `${entity}Controller`, method: 'CreateBody', purpose: 'Put HTTP DTO shape validation fields here.' }),
+    make({ id: `${context}.${entity}Controller.create.transportMapping`, kind: 'transport-mapping', layer: 'Infrastructure', file: path.join(dirs.controller, `${entity}Controller.ts`), className: `${entity}Controller`, method: 'create', purpose: 'Put HTTP request-to-command mapping here.' }),
+    make({ id: `${context}.Mongo${entity}Repository.save.mapping`, kind: 'persistence-mapping', layer: 'Infrastructure', file: path.join(dirs.persistence, `Mongo${entity}Repository.ts`), className: `Mongo${entity}Repository`, method: 'save', purpose: 'Put Mongo persistence mapping for save here.' }),
+    make({ id: `${context}.Mongo${entity}Repository.search.mapping`, kind: 'persistence-mapping', layer: 'Infrastructure', file: path.join(dirs.persistence, `Mongo${entity}Repository.ts`), className: `Mongo${entity}Repository`, method: 'search', purpose: 'Put Mongo query and rehydration mapping here.' }),
+    make({ id: `${context}.Create${entity}.test.behavior`, kind: 'test-behavior', layer: 'Test', file: path.join(root, 'tests', 'unit', context, 'Application', 'UseCase', `Create${entity}`, `Create${entity}.test.ts`), className: `Create${entity}Test`, method: 'creates', purpose: 'Put use case behavior assertions here.' }),
+    make({ id: `${context}.${entity}.apiFeature.createScenario`, kind: 'acceptance-scenario', layer: 'Test', file: path.join(root, 'tests', 'api', context, `create-${kebab(entity)}.feature`), className: `${entity}ApiFeature`, method: 'create scenario', purpose: 'Put API acceptance scenarios here.' })
+  ];
+}
+
+function entityRecipeTasks({ context, entity, root, status = 'DONE' }) {
+  return [
+    { id: `${context}.${entity}.task.context`, title: 'Ensure bounded context folders', intent: 'context.folders.ensure', status },
+    { id: `${context}.${entity}.task.aggregate`, title: 'Ensure aggregate/entity skeleton', intent: 'entity.ensure', status, slots: [`${context}.${entity}.create.domainRules`, `${context}.${entity}.create.domainEvents`] },
+    { id: `${context}.${entity}.task.repositoryInterface`, title: 'Ensure repository interface', intent: 'repository.interface.ensure', status },
+    { id: `${context}.${entity}.task.useCase`, title: `Ensure Create${entity} use case`, intent: 'usecase.command.ensure', status, slots: [`${context}.Create${entity}.run.inputMapping`, `${context}.Create${entity}.run.orchestration`, `${context}.Create${entity}.run.persistence`, `${context}.Create${entity}.run.events`] },
+    { id: `${context}.${entity}.task.controller`, title: `Ensure ${entity} HTTP controller`, intent: 'controller.http.ensure', status, slots: [`${context}.${entity}Controller.create.dtoShape`, `${context}.${entity}Controller.create.transportMapping`] },
+    { id: `${context}.${entity}.task.persistence`, title: `Ensure Mongo${entity}Repository`, intent: 'repository.mongo.ensure', status, slots: [`${context}.Mongo${entity}Repository.save.mapping`, `${context}.Mongo${entity}Repository.search.mapping`] },
+    { id: `${context}.${entity}.task.tests`, title: 'Ensure unit and API test skeletons', intent: 'testing.suite.ensure', status, slots: [`${context}.Create${entity}.test.behavior`, `${context}.${entity}.apiFeature.createScenario`] },
+    { id: `${context}.${entity}.task.manualBusinessLogic`, title: 'Implement business-specific logic in generated slots', intent: 'manual', status: 'MANUAL_AVAILABLE', slots: entityLogicSlots({ root, context, entity }).map((slot) => slot.id) }
+  ];
+}
+
+function nextForLlmFromSlots(slots) {
+  return [
+    'Do not inspect generated files first.',
+    'Use logicSlots to decide where to place business-specific code.',
+    'Use `ahre slot get <slotId> --json` for exact file/class/method/marker.',
+    'Use `ahre code insert-slot --slot <slotId> --content-file <file> --json` to place code deterministically.',
+    ...slots.slice(0, 6).map((slot) => `${slot.kind}: ${slot.id} -> ${slot.path}`)
+  ];
+}
+
+function insertIntoSlot({ root, slot, content, mode = 'replace', effects }) {
+  const file = path.join(root, slot.path);
+  if (!exists(file)) {
+    effects.blocked.push({ path: file, reason: `Slot file does not exist for ${slot.id}.` });
+    return 'BLOCKED';
+  }
+  let source = fs.readFileSync(file, 'utf8');
+  const start = slot.markerStart;
+  const end = slot.markerEnd;
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end);
+  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+    effects.blocked.push({ path: file, reason: `Slot markers not found for ${slot.id}.` });
+    return 'BLOCKED';
+  }
+  const lineStart = source.lastIndexOf('\n', startIndex) + 1;
+  const indent = source.slice(lineStart, startIndex).match(/^\s*/)?.[0] || '';
+  const endLineEnd = source.indexOf('\n', endIndex);
+  const replaceEnd = endLineEnd === -1 ? source.length : endLineEnd;
+  const blockLines = String(content).trimEnd().split(/\r?\n/).map((line) => `${indent}${line}`);
+  const newBlock = `${indent}// ${start}\n${blockLines.join('\n')}\n${indent}// ${end}`;
+  const currentBlock = source.slice(lineStart, replaceEnd);
+  if (currentBlock === newBlock) {
+    effects.existing.push(file);
+    return 'EXISTS';
+  }
+  if (mode === 'append') {
+    const beforeEnd = source.slice(lineStart, source.indexOf(end, startIndex));
+    const appended = `${beforeEnd.trimEnd()}\n${blockLines.join('\n')}\n${indent}// ${end}`;
+    source = `${source.slice(0, lineStart)}${appended}${source.slice(replaceEnd)}`;
+  } else {
+    source = `${source.slice(0, lineStart)}${newBlock}${source.slice(replaceEnd)}`;
+  }
+  fs.writeFileSync(file, source.endsWith('\n') ? source : `${source}\n`);
+  effects.updated.push(file);
+  return 'PATCHED';
 }
 
 function updateInventoryForEntity({ root, inv, context, entity, effects, status = 'skeleton' }) {
@@ -490,8 +766,14 @@ function updateInventoryForEntity({ root, inv, context, entity, effects, status 
   if (!e.tests.includes(`Create${entity}.test.ts`)) e.tests.push(`Create${entity}.test.ts`);
   if (!e.tests.includes(`create-${kebab(entity)}.feature`)) e.tests.push(`create-${kebab(entity)}.feature`);
   e.capabilities.create ??= { transport: 'http', persistence: 'mongo', messaging: 'domain-events', status: 'skeleton' };
+  inv.slots ??= {};
+  const logicSlots = entityLogicSlots({ root, context, entity });
+  e.slots = logicSlots.map((slot) => slot.id);
+  for (const slot of logicSlots) inv.slots[slot.id] = slot;
+  inv.tasks ??= {};
+  for (const task of entityRecipeTasks({ root, context, entity })) inv.tasks[task.id] = { ...task, subject: key };
   inv.artifacts[`${context}.${entity}`] = { type: 'entity', path: e.path, status: e.status };
-  inv.operations.push({ at: new Date().toISOString(), intent: 'entity.capability.ensure', subject: key, effects });
+  inv.operations.push({ at: new Date().toISOString(), intent: 'entity.capability.ensure', subject: key, effects, slots: logicSlots.map((slot) => slot.id) });
 }
 
 function ensureBaseShared(root, effects) {
@@ -511,24 +793,24 @@ function ensureEntityArtifacts({ root, context, entity, flags, effects }) {
   const dirs = contextDirs(root, context);
   ensureBaseShared(root, effects);
   ensureContext(root, context, effects);
-  writeIfMissing(path.join(dirs.model, `${entity}.ts`), templateAggregate({ entity }), effects);
+  writeIfMissing(path.join(dirs.model, `${entity}.ts`), templateAggregate({ context, entity }), effects);
   writeIfMissing(path.join(dirs.valueObject, `${entity}Id.ts`), templateIdVo({ entity }), effects);
   writeIfMissing(path.join(dirs.repository, `${entity}Repository.ts`), templateRepositoryInterface({ entity }), effects);
   const useCaseDir = path.join(dirs.useCase, `Create${entity}`);
-  writeIfMissing(path.join(useCaseDir, `Create${entity}.ts`), templateUseCase({ entity }), effects);
+  writeIfMissing(path.join(useCaseDir, `Create${entity}.ts`), templateUseCase({ context, entity }), effects);
   if ((flags.transport ?? 'http') === 'http') {
     writeIfMissing(path.join(dirs.controller, `${entity}Controller.ts`), templateController({ entity, context }), effects);
   }
   if ((flags.persistence ?? 'mongo') === 'mongo') {
-    writeIfMissing(path.join(dirs.persistence, `Mongo${entity}Repository.ts`), templateMongoRepository({ entity }), effects);
+    writeIfMissing(path.join(dirs.persistence, `Mongo${entity}Repository.ts`), templateMongoRepository({ context, entity }), effects);
   }
   if ((flags.messaging ?? 'domain-events') === 'domain-events') {
     writeIfMissing(path.join(dirs.event, `${entity}WasCreated.ts`), templateEvent({ entity }), effects);
   }
   const unitTest = path.join(root, 'tests', 'unit', context, 'Application', 'UseCase', `Create${entity}`, `Create${entity}.test.ts`);
-  writeIfMissing(unitTest, templateUseCaseTest({ entity }).replaceAll('{{context}}', context), effects);
+  writeIfMissing(unitTest, templateUseCaseTest({ context, entity }), effects);
   const feature = path.join(root, 'tests', 'api', context, `create-${kebab(entity)}.feature`);
-  writeIfMissing(feature, templateApiFeature({ entity }), effects);
+  writeIfMissing(feature, templateApiFeature({ context, entity }), effects);
   const servicesYaml = path.join(root, 'config', 'container', 'services.yaml');
   appendIfMissing(
     servicesYaml,
@@ -847,7 +1129,9 @@ function resolveBundledSkill(id) {
     candidates.push(path.join(skillSourceRoot(), 'authoring', `ahre-${name}-authoring`, 'SKILL.md'));
   }
   candidates.push(path.join(skillSourceRoot(), 'installable', normalized, 'SKILL.md'));
+  candidates.push(path.join(skillSourceRoot(), 'installable', `ahre-${normalized}`, 'SKILL.md'));
   candidates.push(path.join(skillSourceRoot(), 'authoring', normalized, 'SKILL.md'));
+  candidates.push(path.join(skillSourceRoot(), 'authoring', `ahre-${normalized}`, 'SKILL.md'));
   const found = candidates.find((file) => exists(file));
   if (!found) return null;
   const content = fs.readFileSync(found, 'utf8');
@@ -858,6 +1142,7 @@ function resolveBundledSkill(id) {
     file: found,
     content,
     name: data.name || path.basename(path.dirname(found)),
+    directory: path.basename(path.dirname(found)),
     description: data.description || ''
   };
 }
@@ -899,7 +1184,7 @@ function agentsAhreBlock(installedPath) {
 
 This repository uses AhRE — ArcHitecture Recipe Engine.
 
-The AhRE usage skill is installed at:
+The mandatory AhRE entrypoint skill is installed at:
 
 \`${installedPath}\`
 
@@ -907,44 +1192,27 @@ Before creating, modifying, wiring, searching, verifying, or planning code/archi
 
 AhRE is the mandatory first execution path for architecture/code work.
 
-Do NOT manually scaffold or edit these artifacts before attempting AhRE:
+Do NOT manually scaffold or edit architecture/code artifacts before attempting AhRE.
 
-- bounded contexts
-- entities/aggregates
-- value objects
-- repository interfaces
-- repository implementations
-- use cases
-- controllers
-- consumers
-- domain events
-- tests
-- DI bindings
-- runtime/config skeletons
-- architecture folders
+Operational skills are split by surface:
+
+- \`.agents/ahre-generation/SKILL.md\` for recipes, intents, and deterministic slot/code mutations.
+- \`.agents/ahre-context/SKILL.md\` for slots, tasks, inventory, graph, and search before reading files.
+- \`.agents/ahre-quality/SKILL.md\` for deterministic format/lint/typecheck/test/coverage diagnostics.
 
 Minimum required AhRE workflow:
 
 \`\`\`bash
 ahre intents search "<task>" --json
-ahre intents describe <intent> --json
 ahre recipe plan <recipe> --json
 ahre recipe apply <recipe> --json
-ahre inventory get <kind> <id> --json
-ahre verify architecture --json
 \`\`\`
 
-Use macro recipes for capabilities and architecture scaffolding.
-Use micro-intents for surgical edits such as adding methods, imports, tests, or bindings.
+After any AhRE mutation, inspect the returned \`quality\` report. AhRE runs commodity post-action checks automatically.
 
-Manual implementation is allowed only when:
+Do not inspect generated files first. Use returned \`logicSlots\`, \`tasks\`, \`currentKnowledge\`, \`graph\`, and \`quality\`.
 
-- AhRE is unavailable;
-- AhRE returns \`BLOCKED\`;
-- no applicable recipe/intent exists;
-- the remaining work is business-specific logic that AhRE intentionally leaves as TODO.
-
-When falling back to manual work, state why AhRE was not used.
+Manual implementation is allowed only when AhRE is unavailable, returns \`BLOCKED\`, no applicable recipe/intent exists, or business-specific logic intentionally remains for the LLM.
 ${AGENTS_AHRE_BLOCK_END}`;
 }
 
@@ -986,7 +1254,7 @@ function installSkill({ root, skill, flags }) {
     };
   }
   const targetDir = skillInstallDir(root, flags);
-  const skillDir = path.join(targetDir, skill.name);
+  const skillDir = path.join(targetDir, skill.directory || skill.name);
   const dest = path.join(skillDir, 'SKILL.md');
   ensureDir(skillDir);
   const previous = exists(dest) ? fs.readFileSync(dest, 'utf8') : null;
@@ -1012,7 +1280,7 @@ function installSkill({ root, skill, flags }) {
 
 const ARCHITECTURE_PACK = {
   name: 'ms-expeditions-clean-ddd',
-  version: '0.4.1',
+  version: '0.6.0',
   source: 'ARCHITECTURE.md',
   description: 'AhRE architecture pack for TypeScript/Node.js backend services using Clean Architecture, Hexagonal adapters, DDD bounded contexts, CQRS, DI YAML, AMQP/SQS, Mongo/TypeORM/Redis/S3, PDF/XLSX, JWT/RBAC, Jest and Cucumber.',
   policies: [
@@ -1135,10 +1403,13 @@ function templateServicePackageJson(serviceName) {
     type: 'module',
     scripts: {
       build: 'tsc -p tsconfig.json',
+      format: 'prettier --write .',
+      'format:check': 'prettier --check .',
       typecheck: 'tsc -p tsconfig.json --noEmit',
       lint: 'eslint .',
       test: 'npm run test:unit && npm run test:api && npm run test:command',
       'test:unit': 'jest --config jest.config.cjs --passWithNoTests',
+      coverage: 'jest --config jest.config.cjs --coverage --passWithNoTests',
       'test:api': 'cucumber-js tests/api --publish-quiet || true',
       'test:command': 'cucumber-js tests/command --publish-quiet || true',
       dev: 'node --watch src/index.ts',
@@ -1338,6 +1609,176 @@ function updateInventoryArchitecture(root, inv, operation, subject, effects, ext
   inv.operations.push({ at: new Date().toISOString(), intent: operation, subject, effects, ...extra });
 }
 
+
+function qualityConfig(root) {
+  const cfg = readJson(path.join(root, '.ahre', 'config.json'), {});
+  const pkg = readJson(path.join(root, 'package.json'), null);
+  const scripts = pkg?.scripts || {};
+  const commands = cfg.quality?.commands || {};
+  const scriptCmd = (name) => commands[name] || (scripts[name] ? `npm run ${name}` : null);
+  return {
+    defaultMode: cfg.quality?.defaultMode || 'fast',
+    autoRunAfterMutation: cfg.quality?.autoRunAfterMutation !== false,
+    stopOnFirstFailure: Boolean(cfg.quality?.stopOnFirstFailure),
+    commands: {
+      format: commands.format || scriptCmd('format'),
+      lint: commands.lint || scriptCmd('lint'),
+      typecheck: commands.typecheck || scriptCmd('typecheck') || scriptCmd('build'),
+      test: commands.test || scriptCmd('test:unit') || scriptCmd('test'),
+      coverage: commands.coverage || scriptCmd('coverage')
+    },
+    hasPackageJson: Boolean(pkg),
+    hasNodeModules: exists(path.join(root, 'node_modules'))
+  };
+}
+
+function runShellCommand(root, command, { allowWithoutNodeModules = false } = {}) {
+  if (!command) return { status: 'SKIPPED', reason: 'No command configured.' };
+  if (!allowWithoutNodeModules && command.startsWith('npm run') && !exists(path.join(root, 'node_modules'))) {
+    return { status: 'SKIPPED', command, reason: 'node_modules is missing; run npm install before executing project quality scripts.' };
+  }
+  const result = spawnSync(command, { cwd: root, shell: true, encoding: 'utf8', timeout: 120000, maxBuffer: 1024 * 1024 * 4 });
+  return { status: result.status === 0 ? 'OK' : 'FAILED', command, exitCode: result.status, signal: result.signal || null, stdout: result.stdout || '', stderr: result.stderr || '' };
+}
+
+function summarizeOutput(text, maxLines = 12) {
+  return String(text || '').split(/\r?\n/).filter(Boolean).slice(0, maxLines);
+}
+
+function parseEslintDiagnostics(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((file) => (file.messages || []).map((m) => ({
+      tool: 'eslint', file: file.filePath ? file.filePath.split(path.sep).join('/') : undefined,
+      line: m.line || null, column: m.column || null, severity: m.severity === 2 ? 'error' : 'warning', rule: m.ruleId || null, message: m.message || ''
+    })));
+  } catch { return []; }
+}
+
+function parseTscDiagnostics(raw) {
+  const text = String(raw || '');
+  const rx = /([^\s()]+\.ts)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.+)/g;
+  const out = [];
+  let m;
+  while ((m = rx.exec(text))) out.push({ tool: 'tsc', file: m[1].split(path.sep).join('/'), line: Number(m[2]), column: Number(m[3]), severity: 'error', rule: m[4], message: m[5] });
+  return out;
+}
+
+function detectSlotForDiagnostic(root, diagnostic, inv) {
+  if (!diagnostic.file || !diagnostic.line) return null;
+  const abs = path.isAbsolute(diagnostic.file) ? diagnostic.file : path.join(root, diagnostic.file);
+  if (!exists(abs)) return null;
+  const source = fs.readFileSync(abs, 'utf8').split(/\r?\n/);
+  const lineIndex = Number(diagnostic.line) - 1;
+  let current = null;
+  for (let i = 0; i <= lineIndex && i < source.length; i += 1) {
+    const start = source[i].match(/AHRE_SLOT_START:([^\s]+)/);
+    const end = source[i].match(/AHRE_SLOT_END:([^\s]+)/);
+    if (start) current = start[1];
+    if (end && end[1] === current && i < lineIndex) current = null;
+  }
+  return inv.slots?.[current] ? current : null;
+}
+
+function verifySlotIntegrity(root, inv) {
+  const issues = [];
+  for (const slot of Object.values(inv.slots || {})) {
+    const file = path.join(root, slot.path);
+    if (!exists(file)) { issues.push({ tool: 'ahre-slot', file: slot.path, severity: 'error', message: `Slot file is missing: ${slot.id}`, slot: slot.id }); continue; }
+    const text = fs.readFileSync(file, 'utf8');
+    if (!text.includes(slot.markerStart) || !text.includes(slot.markerEnd)) issues.push({ tool: 'ahre-slot', file: slot.path, severity: 'error', message: `Slot markers are missing or incomplete: ${slot.id}`, slot: slot.id });
+  }
+  return { status: issues.length ? 'FAILED' : 'OK', errors: issues.length, issues };
+}
+
+function verifyArchitecture(root) {
+  const issues = [];
+  const scanRoot = srcRoot(root);
+  if (exists(scanRoot)) {
+    const files = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.tsx?$/.test(entry.name)) files.push(full);
+      }
+    };
+    walk(scanRoot);
+    for (const file of files) {
+      const text = fs.readFileSync(file, 'utf8');
+      const relative = rel(root, file);
+      if (relative.includes('/Domain/') && /from ['"][^'"]*(express|routing-controllers|mongodb|typeorm|redis|aws|jsonwebtoken|jwks|winston)/.test(text)) issues.push({ severity: 'critical', file: relative, rule: 'domain-must-not-import-infrastructure' });
+      if (relative.includes('/Application/') && /from ['"][^'"]*(express|routing-controllers|mongodb|typeorm|redis|aws|jsonwebtoken|jwks|winston)/.test(text)) issues.push({ severity: 'major', file: relative, rule: 'application-must-not-import-concrete-infrastructure' });
+      if (/from ['"](?:\.\.\/){4,}/.test(text)) issues.push({ severity: 'minor', file: relative, rule: 'possible-cross-boundary-relative-import' });
+    }
+  }
+  const inv = loadInventory(root);
+  return { status: issues.length ? 'WARNING' : 'OK', check: 'architecture', issues, inventory: { path: rel(root, inventoryPath(root)), entities: Object.keys(inv.entities || {}).length } };
+}
+
+async function runQualityPipeline(root, { mode = 'fast', changedFiles = [], inv = null } = {}) {
+  const cfg = qualityConfig(root);
+  const inventory = inv || loadInventory(root);
+  const report = { status: 'OK', mode, root: rel(process.cwd(), root), changedFiles: changedFiles.map((file) => rel(root, file)), static: {}, tests: { status: mode === 'full' ? 'NOT_RUN' : 'SKIPPED', reason: mode === 'full' ? undefined : 'Quality mode fast does not run tests.' }, coverage: { status: mode === 'full' ? 'NOT_RUN' : 'SKIPPED', reason: mode === 'full' ? undefined : 'Quality mode fast does not run coverage.' }, diagnostics: [], summary: '' };
+  if (mode === 'off') { report.status = 'SKIPPED'; report.summary = 'Quality pipeline skipped by --quality off.'; return report; }
+  if (!cfg.hasPackageJson) {
+    report.static.format = { status: 'SKIPPED', reason: 'No package.json found.' };
+    report.static.lint = { status: 'SKIPPED', reason: 'No package.json found.' };
+    report.static.typecheck = { status: 'SKIPPED', reason: 'No package.json found.' };
+  } else {
+    const format = runShellCommand(root, cfg.commands.format);
+    report.static.format = { status: format.status, command: format.command, reason: format.reason, exitCode: format.exitCode, output: format.status === 'FAILED' ? summarizeOutput(`${format.stdout}\n${format.stderr}`) : undefined };
+    const lint = runShellCommand(root, cfg.commands.lint ? `${cfg.commands.lint} -- --format json` : null);
+    const lintRaw = `${lint.stdout || ''}`.trim() || `${lint.stderr || ''}`.trim();
+    const lintDiagnostics = parseEslintDiagnostics(lintRaw);
+    report.static.lint = { status: lint.status, command: lint.command, reason: lint.reason, exitCode: lint.exitCode, errors: lintDiagnostics.filter((d) => d.severity === 'error').length, warnings: lintDiagnostics.filter((d) => d.severity === 'warning').length, output: lint.status === 'FAILED' && !lintDiagnostics.length ? summarizeOutput(`${lint.stdout}\n${lint.stderr}`) : undefined };
+    report.diagnostics.push(...lintDiagnostics);
+    const typecheck = runShellCommand(root, cfg.commands.typecheck);
+    const typeDiagnostics = parseTscDiagnostics(`${typecheck.stdout}\n${typecheck.stderr}`);
+    report.static.typecheck = { status: typecheck.status, command: typecheck.command, reason: typecheck.reason, exitCode: typecheck.exitCode, errors: typeDiagnostics.length, output: typecheck.status === 'FAILED' && !typeDiagnostics.length ? summarizeOutput(`${typecheck.stdout}\n${typecheck.stderr}`) : undefined };
+    report.diagnostics.push(...typeDiagnostics);
+  }
+  const arch = verifyArchitecture(root);
+  report.static.architecture = { status: arch.status, errors: arch.issues?.length || 0, issues: arch.issues || [] };
+  const slotIntegrity = verifySlotIntegrity(root, inventory);
+  report.static.slots = slotIntegrity;
+  report.diagnostics.push(...(slotIntegrity.issues || []));
+  if (mode === 'full' && cfg.hasPackageJson) {
+    const test = runShellCommand(root, cfg.commands.test);
+    report.tests = { status: test.status, command: test.command, reason: test.reason, exitCode: test.exitCode, output: test.status === 'FAILED' ? summarizeOutput(`${test.stdout}\n${test.stderr}`, 20) : undefined };
+    const coverage = runShellCommand(root, cfg.commands.coverage);
+    report.coverage = { status: coverage.status, command: coverage.command, reason: coverage.reason, exitCode: coverage.exitCode, output: coverage.status === 'FAILED' ? summarizeOutput(`${coverage.stdout}\n${coverage.stderr}`, 20) : undefined };
+  }
+  report.diagnostics = report.diagnostics.map((d) => ({ ...d, slot: d.slot || detectSlotForDiagnostic(root, d, inventory) })).slice(0, 50);
+  const failed = [];
+  for (const [groupName, group] of Object.entries(report.static)) if (group?.status === 'FAILED') failed.push(`static.${groupName}`);
+  if (report.tests.status === 'FAILED') failed.push('tests');
+  if (report.coverage.status === 'FAILED') failed.push('coverage');
+  report.status = failed.length ? 'FAILED' : 'OK';
+  report.summary = failed.length ? `Quality failed: ${failed.join(', ')}.` : 'Quality checks passed or were explicitly skipped.';
+  return report;
+}
+
+async function withPostMutationQuality(root, payload, flags, effects) {
+  const mode = flags.quality || 'fast';
+  if (mode === 'off') return { ...payload, quality: { status: 'SKIPPED', mode: 'off', summary: 'Quality pipeline skipped by --quality off.' } };
+  const changedFiles = [...(effects?.created || []), ...(effects?.updated || [])].filter((file) => typeof file === 'string' && !file.includes('.ahre/inventory.json'));
+  const inv = loadInventory(root);
+  const graph = exists(srcRoot(root)) ? await buildDependencyGraph(root) : null;
+  const quality = await runQualityPipeline(root, { mode, changedFiles, inv });
+  const status = payload.status === 'OK' && quality.status === 'FAILED' ? 'ACTION_REQUIRED' : payload.status;
+  const nextForLLM = [...(payload.nextForLLM || [])];
+  if (quality.status === 'FAILED') {
+    const first = quality.diagnostics?.[0];
+    if (first?.file) nextForLLM.push(`Fix ${first.tool || 'quality'} issue at ${first.file}${first.line ? `:${first.line}${first.column ? `:${first.column}` : ''}` : ''}.`);
+    nextForLLM.push('After fixing, run `ahre quality run --json`.');
+  } else nextForLLM.push('Trust the returned quality report; do not rerun external format/lint/typecheck manually unless a check was skipped or deeper verification is requested.');
+  return { ...payload, status, graph: graph ? { status: 'UPDATED', graphPath: rel(root, graphPath(root)), fileCount: Object.keys(graph.files).length } : (payload.graph || { status: 'SKIPPED' }), quality, nextForLLM };
+}
+
 export class AhreCli {
   constructor({ cwd }) {
     this.cwd = cwd;
@@ -1350,7 +1791,7 @@ export class AhreCli {
     const [group, action, subject, maybe] = positional;
 
     if (group === 'intents') return this.handleIntents(action, subject, flags);
-    if (group === 'recipe') return this.handleRecipe(action, subject, flags);
+    if (group === 'recipe') return await this.handleRecipe(action, subject, flags);
     if (group === 'ensure') return await this.handleEnsure(action, subject, maybe, flags);
     if (group === 'inventory') return await this.handleInventory(action, subject, maybe, flags);
     if (group === 'verify') return await this.handleVerify(action, subject, flags);
@@ -1361,11 +1802,14 @@ export class AhreCli {
     if (group === 'pack') return this.handlePack(action, subject, maybe, flags);
     if (group === 'template' || group === 'templates') return this.handleTemplate(action, subject, maybe, flags);
     if (group === 'skill') return this.handleSkill(action, subject, maybe, flags);
+    if (group === 'slot' || group === 'slots') return this.handleSlot(action, subject, maybe, flags);
+    if (group === 'task' || group === 'tasks') return this.handleTask(action, subject, maybe, flags);
+    if (group === 'quality') return await this.handleQuality(action, subject, maybe, flags);
     throw new Error(`Unknown command group: ${group}`);
   }
 
   help() {
-    console.log(`AhRE — ArcHitecture Recipe Engine CLI ${VERSION}\n\nUsage:\n  ahre intents list --json\n  ahre intents search <query> --json\n  ahre intents describe <intent> --json\n\n  ahre recipe plan entity.capability.ensure --entity User --context Users --json\n  ahre recipe apply entity.capability.ensure --entity User --context Users --json\n\n  ahre ensure entity --entity User --context Users --json\n  ahre ensure method --entity User --context Users --method changeEmail --json\n\n  ahre inventory get entity Users.User --json\n  ahre inventory list entities --json\n  ahre verify architecture --json\n\n  ahre skill list --all --json\n  ahre skill show usage --json\n  ahre skill install usage --target project --json\n  ahre skill doctor --target project --json\n`);
+    console.log(`AhRE — ArcHitecture Recipe Engine CLI ${VERSION}\n\nUsage:\n  ahre intents list --json\n  ahre intents search <query> --json\n  ahre intents describe <intent> --json\n\n  ahre recipe plan entity.capability.ensure --entity User --context Users --json\n  ahre recipe apply entity.capability.ensure --entity User --context Users --json\n\n  ahre ensure entity --entity User --context Users --json\n  ahre ensure method --entity User --context Users --method changeEmail --json\n\n  ahre inventory get entity Users.User --json\n  ahre inventory list entities --json\n  ahre verify architecture --json\n\n  ahre skill list --all --json\n  ahre skill show usage --json\n  ahre skill install usage --target project --json\n  ahre skill doctor --target project --json\n\n  ahre slot list --entity Users.User --json\n  ahre slot get Users.User.create.domainRules --json\n  ahre code insert-slot --slot Users.User.create.domainRules --content-file ./snippet.ts --json\n  ahre task list --json\n`);
   }
 
   output(payload, asJson = false) {
@@ -1394,7 +1838,7 @@ export class AhreCli {
     throw new Error(`Unknown intents action: ${action}`);
   }
 
-  handleRecipe(action, subject, flags) {
+  async handleRecipe(action, subject, flags) {
     if (action === 'list') {
       return this.output({ status: 'OK', pack: ARCHITECTURE_PACK.name, recipes: ARCHITECTURE_PACK.recipes }, flags.json);
     }
@@ -1423,7 +1867,7 @@ export class AhreCli {
       updateInventoryArchitecture(serviceDir, inv, subject, flags.service || path.basename(serviceDir), normalizeEffectPaths(serviceDir, effects));
       saveInventory(serviceDir, inv);
       effects.updated.push(inventoryPath(serviceDir));
-      return this.output({ status: 'OK', mode: 'apply', recipe: subject, subject: flags.service || path.basename(serviceDir), effects: normalizeEffectPaths(serviceDir, effects), currentKnowledge: { service: { root: rel(root, serviceDir), architecturePack: ARCHITECTURE_PACK.name } }, nextSuggestedIntents: ['ahre recipe apply bounded-context.ensure --context <Context> --json', 'ahre recipe apply entity.capability.ensure --entity <Entity> --context <Context> --json'] }, flags.json);
+      return this.output(await withPostMutationQuality(serviceDir, { status: 'OK', mode: 'apply', recipe: subject, subject: flags.service || path.basename(serviceDir), effects: normalizeEffectPaths(serviceDir, effects), currentKnowledge: { service: { root: rel(root, serviceDir), architecturePack: ARCHITECTURE_PACK.name } }, nextForLLM: ['Use AhRE recipes for bounded contexts and capabilities before manual scaffolding.'], nextSuggestedIntents: ['ahre recipe apply bounded-context.ensure --context <Context> --json', 'ahre recipe apply entity.capability.ensure --entity <Entity> --context <Context> --json'] }, flags, effects), flags.json);
     }
 
     if (subject === 'bounded-context.ensure') {
@@ -1440,7 +1884,7 @@ export class AhreCli {
       updateInventoryArchitecture(root, inv, subject, context, normalizeEffectPaths(root, effects));
       saveInventory(root, inv);
       effects.updated.push(inventoryPath(root));
-      return this.output({ status: 'OK', mode: 'apply', recipe: subject, subject: context, effects: normalizeEffectPaths(root, effects), currentKnowledge: { context: inv.contexts[context] } }, flags.json);
+      return this.output(await withPostMutationQuality(root, { status: 'OK', mode: 'apply', recipe: subject, subject: context, effects: normalizeEffectPaths(root, effects), currentKnowledge: { context: inv.contexts[context] } }, flags, effects), flags.json);
     }
 
     if (subject === 'entity.capability.ensure') {
@@ -1450,7 +1894,7 @@ export class AhreCli {
       if (!entity || !context) throw new Error('--entity and --context are required');
       const plan = this.planEntityCapability({ root, entity, context, flags });
       if (action === 'plan') return this.output({ ...plan, forceJson: flags.json }, flags.json);
-      return this.applyEntityCapability({ root, entity, context, flags, plan });
+      return await this.applyEntityCapability({ root, entity, context, flags, plan });
     }
 
     if (subject === 'consumer.event.ensure') {
@@ -1471,7 +1915,7 @@ export class AhreCli {
       updateInventoryArchitecture(root, inv, subject, `${context}.${consumerName}`, normalizeEffectPaths(root, effects));
       saveInventory(root, inv);
       effects.updated.push(inventoryPath(root));
-      return this.output({ status: 'OK', mode: 'apply', recipe: subject, subject: `${context}.${consumerName}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { consumer: inv.consumers[`${context}.${consumerName}`] } }, flags.json);
+      return this.output(await withPostMutationQuality(root, { status: 'OK', mode: 'apply', recipe: subject, subject: `${context}.${consumerName}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { consumer: inv.consumers[`${context}.${consumerName}`] } }, flags, effects), flags.json);
     }
 
     if (subject === 'document.pdf.ensure' || subject === 'document.xlsx.ensure') {
@@ -1491,7 +1935,7 @@ export class AhreCli {
       updateInventoryArchitecture(root, inv, subject, `${context}.${name}`, normalizeEffectPaths(root, effects));
       saveInventory(root, inv);
       effects.updated.push(inventoryPath(root));
-      return this.output({ status: 'OK', mode: 'apply', recipe: subject, subject: `${context}.${name}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { document: inv.documents[`${context}.${name}.${isPdf ? 'pdf' : 'xlsx'}`] } }, flags.json);
+      return this.output(await withPostMutationQuality(root, { status: 'OK', mode: 'apply', recipe: subject, subject: `${context}.${name}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { document: inv.documents[`${context}.${name}.${isPdf ? 'pdf' : 'xlsx'}`] } }, flags, effects), flags.json);
     }
 
     throw new Error(`Unknown recipe: ${subject}`);
@@ -1527,12 +1971,14 @@ export class AhreCli {
       wouldPatch: alreadyExists.includes('config/container/services.yaml') ? ['config/container/services.yaml'] : [],
       alreadyExists,
       conflicts: [],
-      warnings: flags.schema ? [] : ['No schema provided; AhRE will generate minimal skeletons and structured TODO markers.'],
+      warnings: flags.schema ? [] : ['No schema provided; AhRE will generate minimal skeletons and AHRE_SLOT markers.'],
+      tasks: entityRecipeTasks({ root, context, entity, status: 'PENDING' }),
+      logicSlots: entityLogicSlots({ root, context, entity }),
       next: [`ahre recipe apply entity.capability.ensure --entity ${entity} --context ${context} --json`]
     };
   }
 
-  applyEntityCapability({ root, entity, context, flags, plan }) {
+  async applyEntityCapability({ root, entity, context, flags, plan }) {
     const effects = newEffects();
     ensureEntityArtifacts({ root, context, entity, flags, effects });
     const inv = loadInventory(root);
@@ -1549,8 +1995,12 @@ export class AhreCli {
       summary: `Ensured ${context}.${entity}.create capability.`,
       effects: normalized,
       inventoryPath: rel(root, inventoryPath(root)),
-      inventoryDelta: { entities: { [`${context}.${entity}`]: currentKnowledge } },
+      inventoryDelta: { entities: { [`${context}.${entity}`]: currentKnowledge }, slots: entityLogicSlots({ root, context, entity }).reduce((acc, slot) => ({ ...acc, [slot.id]: slot }), {}) },
       currentKnowledge: { entity: currentKnowledge },
+      tasks: entityRecipeTasks({ root, context, entity }),
+      logicSlots: entityLogicSlots({ root, context, entity }),
+      nextForLLM: nextForLlmFromSlots(entityLogicSlots({ root, context, entity })),
+      graph: { status: 'STALE', refreshCommand: 'ahre graph build --json' },
       warnings: [...plan.warnings, ...normalized.warnings],
       nextSuggestedIntents: [
         `ahre ensure method --entity ${entity} --context ${context} --method <businessMethod> --json`,
@@ -1558,7 +2008,7 @@ export class AhreCli {
         `ahre inventory get entity ${context}.${entity} --json`
       ]
     };
-    return this.output(payload, flags.json);
+    return this.output(await withPostMutationQuality(root, payload, flags, effects), flags.json);
   }
 
   async handleEnsure(action, subject, maybe, flags) {
@@ -1570,13 +2020,13 @@ export class AhreCli {
       const effects = newEffects();
       ensureContext(root, context, effects);
       ensureBaseShared(root, effects);
-      writeIfMissing(path.join(contextDirs(root, context).model, `${entity}.ts`), templateAggregate({ entity }), effects);
+      writeIfMissing(path.join(contextDirs(root, context).model, `${entity}.ts`), templateAggregate({ context, entity }), effects);
       writeIfMissing(path.join(contextDirs(root, context).valueObject, `${entity}Id.ts`), templateIdVo({ entity }), effects);
       const inv = loadInventory(root);
       updateInventoryForEntity({ root, inv, context, entity, effects: normalizeEffectPaths(root, effects) });
       saveInventory(root, inv);
       effects.updated.push(inventoryPath(root));
-      return this.output({ status: 'OK', intent: 'entity.ensure', subject: `${context}.${entity}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { entity: inv.entities[`${context}.${entity}`] } }, flags.json);
+      return this.output(await withPostMutationQuality(root, { status: 'OK', intent: 'entity.ensure', subject: `${context}.${entity}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { entity: inv.entities[`${context}.${entity}`] }, logicSlots: entityLogicSlots({ root, context, entity }), nextForLLM: nextForLlmFromSlots(entityLogicSlots({ root, context, entity })) }, flags, effects), flags.json);
     }
     if (action === 'method') {
       const root = serviceRoot(this.cwd, flags);
@@ -1596,7 +2046,7 @@ export class AhreCli {
       saveInventory(root, inv);
       effects.updated.push(inventoryPath(root));
       const normalized = normalizeEffectPaths(root, effects);
-      return this.output({ status: normalized.blocked.length ? 'BLOCKED' : 'OK', intent: 'method.ensure', subject: `${key}.${method}`, step, effects: normalized, currentKnowledge: { entity: inv.entities[key] } }, flags.json);
+      return this.output(await withPostMutationQuality(root, { status: normalized.blocked.length ? 'BLOCKED' : 'OK', intent: 'method.ensure', subject: `${key}.${method}`, step, effects: normalized, currentKnowledge: { entity: inv.entities[key] } }, flags, effects), flags.json);
     }
     if (action === 'value-object' || action === 'vo') {
       const root = serviceRoot(this.cwd, flags);
@@ -1612,7 +2062,7 @@ export class AhreCli {
       updateInventoryArchitecture(root, inv, 'value-object.ensure', `${context}.${name}`, normalizeEffectPaths(root, effects));
       saveInventory(root, inv);
       effects.updated.push(inventoryPath(root));
-      return this.output({ status: 'OK', intent: 'value-object.ensure', subject: `${context}.${name}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { valueObject: inv.valueObjects[`${context}.${name}`] } }, flags.json);
+      return this.output(await withPostMutationQuality(root, { status: 'OK', intent: 'value-object.ensure', subject: `${context}.${name}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { valueObject: inv.valueObjects[`${context}.${name}`] } }, flags, effects), flags.json);
     }
     if (action === 'domain-event' || action === 'event') {
       const root = serviceRoot(this.cwd, flags);
@@ -1627,7 +2077,7 @@ export class AhreCli {
       updateInventoryArchitecture(root, inv, 'domain-event.ensure', `${context}.${event}`, normalizeEffectPaths(root, effects));
       saveInventory(root, inv);
       effects.updated.push(inventoryPath(root));
-      return this.output({ status: 'OK', intent: 'domain-event.ensure', subject: `${context}.${event}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { event: inv.events[`${context}.${event}`] } }, flags.json);
+      return this.output(await withPostMutationQuality(root, { status: 'OK', intent: 'domain-event.ensure', subject: `${context}.${event}`, effects: normalizeEffectPaths(root, effects), currentKnowledge: { event: inv.events[`${context}.${event}`] } }, flags, effects), flags.json);
     }
     if (action === 'security') {
       const root = serviceRoot(this.cwd, flags);
@@ -1637,7 +2087,7 @@ export class AhreCli {
       updateInventoryArchitecture(root, inv, 'security.rbac.ensure', 'Shared.Security', normalizeEffectPaths(root, effects));
       saveInventory(root, inv);
       effects.updated.push(inventoryPath(root));
-      return this.output({ status: 'OK', intent: 'security.rbac.ensure', subject: 'Shared.Security', effects: normalizeEffectPaths(root, effects) }, flags.json);
+      return this.output(await withPostMutationQuality(root, { status: 'OK', intent: 'security.rbac.ensure', subject: 'Shared.Security', effects: normalizeEffectPaths(root, effects) }, flags, effects), flags.json);
     }
     if (action === 'messaging') {
       const root = serviceRoot(this.cwd, flags);
@@ -1647,7 +2097,7 @@ export class AhreCli {
       updateInventoryArchitecture(root, inv, 'messaging.shared.ensure', 'Shared.Messaging', normalizeEffectPaths(root, effects));
       saveInventory(root, inv);
       effects.updated.push(inventoryPath(root));
-      return this.output({ status: 'OK', intent: 'messaging.shared.ensure', subject: 'Shared.Messaging', effects: normalizeEffectPaths(root, effects) }, flags.json);
+      return this.output(await withPostMutationQuality(root, { status: 'OK', intent: 'messaging.shared.ensure', subject: 'Shared.Messaging', effects: normalizeEffectPaths(root, effects) }, flags, effects), flags.json);
     }
     if (action === 'testing') {
       const root = serviceRoot(this.cwd, flags);
@@ -1657,7 +2107,7 @@ export class AhreCli {
       updateInventoryArchitecture(root, inv, 'testing.suite.ensure', 'tests', normalizeEffectPaths(root, effects));
       saveInventory(root, inv);
       effects.updated.push(inventoryPath(root));
-      return this.output({ status: 'OK', intent: 'testing.suite.ensure', subject: 'tests', effects: normalizeEffectPaths(root, effects) }, flags.json);
+      return this.output(await withPostMutationQuality(root, { status: 'OK', intent: 'testing.suite.ensure', subject: 'tests', effects: normalizeEffectPaths(root, effects) }, flags, effects), flags.json);
     }
     throw new Error(`Unknown ensure action: ${action}`);
   }
@@ -1695,6 +2145,7 @@ export class AhreCli {
     if (action === 'consumer') return this.handleRecipe('apply', 'consumer.event.ensure', { ...flags, event: flags.event || subject });
     if (action === 'service') return this.handleRecipe('apply', 'architecture.service.ensure', flags);
     if (action === 'context') return this.handleRecipe('apply', 'bounded-context.ensure', { ...flags, context: flags.context || subject });
+    if (action === 'insert-slot') return await this.handleCodeInsertSlot(flags);
     throw new Error(`Unknown code action: ${action}`);
   }
 
@@ -1769,6 +2220,65 @@ export class AhreCli {
 
 
 
+
+  handleSlot(action, subject, maybe, flags) {
+    const root = serviceRoot(this.cwd, flags);
+    const inv = loadInventory(root);
+    if (action === 'list' || !action) {
+      let slots = Object.values(inv.slots || {});
+      const entityKey = flags.entity || subject;
+      if (entityKey) slots = slots.filter((slot) => slot.id.startsWith(entityKey) || slot.id.includes(`.${entityKey}.`) || slot.path.includes(String(entityKey).split('.').pop()));
+      return this.output({ status: 'OK', slots, count: slots.length, instruction: 'Use these slots instead of reading generated files to locate where business-specific logic belongs.' }, flags.json);
+    }
+    if (action === 'get') {
+      const id = subject || flags.slot || flags.id;
+      if (!id) throw new Error('slot get requires <slotId> or --slot');
+      const slot = inv.slots?.[id];
+      return this.output({ status: slot ? 'OK' : 'NOT_FOUND', slotId: id, slot: slot ?? null }, flags.json);
+    }
+    throw new Error(`Unknown slot action: ${action}`);
+  }
+
+  handleTask(action, subject, maybe, flags) {
+    const root = serviceRoot(this.cwd, flags);
+    const inv = loadInventory(root);
+    if (action === 'list' || !action) {
+      let tasks = Object.values(inv.tasks || {});
+      const entityKey = flags.entity || subject;
+      if (entityKey) tasks = tasks.filter((task) => task.subject === entityKey || task.id.startsWith(entityKey));
+      return this.output({ status: 'OK', tasks, count: tasks.length }, flags.json);
+    }
+    if (action === 'get') {
+      const id = subject || flags.task || flags.id;
+      const task = inv.tasks?.[id];
+      return this.output({ status: task ? 'OK' : 'NOT_FOUND', taskId: id, task: task ?? null }, flags.json);
+    }
+    if (action === 'next') {
+      const tasks = Object.values(inv.tasks || {});
+      const next = tasks.find((task) => ['MANUAL_AVAILABLE', 'PENDING', 'READY'].includes(task.status));
+      return this.output({ status: next ? 'OK' : 'NONE', nextTask: next ?? null }, flags.json);
+    }
+    throw new Error(`Unknown task action: ${action}`);
+  }
+
+  async handleCodeInsertSlot(flags) {
+    const root = serviceRoot(this.cwd, flags);
+    const slotId = flags.slot || flags.id;
+    if (!slotId) throw new Error('code insert-slot requires --slot <slotId>');
+    const inv = loadInventory(root);
+    const slot = inv.slots?.[slotId];
+    if (!slot) return this.output({ status: 'NOT_FOUND', slotId, instruction: 'Run `ahre slot list --json` to see available slots.' }, flags.json);
+    let content = flags.content || '';
+    if (flags['content-file']) content = fs.readFileSync(path.resolve(root, flags['content-file']), 'utf8');
+    if (!content) throw new Error('code insert-slot requires --content or --content-file');
+    const effects = newEffects();
+    const step = insertIntoSlot({ root, slot, content, mode: flags.mode || 'replace', effects });
+    inv.operations.push({ at: new Date().toISOString(), intent: 'code.insert-slot', subject: slotId, step, effects: normalizeEffectPaths(root, effects) });
+    saveInventory(root, inv);
+    effects.updated.push(inventoryPath(root));
+    return this.output(await withPostMutationQuality(root, { status: effects.blocked.length ? 'BLOCKED' : 'OK', intent: 'code.insert-slot', slot, step, effects: normalizeEffectPaths(root, effects), graph: { status: 'STALE', refreshCommand: 'ahre graph build --json' } }, flags, effects), flags.json);
+  }
+
   handlePack(action, subject, maybe, flags) {
     if (action === 'list' || !action) return this.output({ status: 'OK', pack: ARCHITECTURE_PACK }, flags.json);
     if (action === 'show' || action === 'describe') {
@@ -1828,6 +2338,16 @@ export class AhreCli {
     }
     if (action === 'install') {
       const id = subject || 'usage';
+      if (id === 'usage' || id === 'ahre-usage') {
+        const ids = ['usage', 'generation', 'context', 'quality'];
+        const installed = [];
+        for (const skillId of ids) {
+          const skill = resolveBundledSkill(skillId);
+          if (!skill) continue;
+          installed.push(installSkill({ root, skill, flags: { ...flags, 'no-agents-md': skillId !== 'usage' ? true : flags['no-agents-md'] } }));
+        }
+        return this.output({ status: 'OK', bundle: 'usage', installed }, flags.json);
+      }
       const skill = resolveBundledSkill(id);
       if (!skill) return this.output({ status: 'NOT_FOUND', id }, flags.json);
       const result = installSkill({ root, skill, flags });
@@ -1849,36 +2369,27 @@ export class AhreCli {
     throw new Error(`Unknown skill action: ${action}`);
   }
 
+  async handleQuality(action, subject, maybe, flags) {
+    const root = serviceRoot(this.cwd, flags);
+    const mode = flags.mode || flags.quality || (action === 'full' ? 'full' : 'fast');
+    if (action === 'run' || action === 'static' || action === 'full' || !action) {
+      const selectedMode = action === 'static' ? 'fast' : mode;
+      const quality = await runQualityPipeline(root, { mode: selectedMode, changedFiles: [], inv: loadInventory(root) });
+      return this.output({ status: quality.status === 'FAILED' ? 'ACTION_REQUIRED' : 'OK', intent: 'quality.run', quality }, flags.json);
+    }
+    if (['format', 'lint', 'typecheck', 'test', 'coverage'].includes(action)) {
+      const cfg = qualityConfig(root);
+      const command = cfg.commands[action];
+      const result = runShellCommand(root, command);
+      const diagnostics = action === 'lint' ? parseEslintDiagnostics((result.stdout || '').trim() || (result.stderr || '').trim()) : action === 'typecheck' ? parseTscDiagnostics(`${result.stdout}\n${result.stderr}`) : [];
+      return this.output({ status: result.status === 'FAILED' ? 'ACTION_REQUIRED' : result.status, intent: `quality.${action}`, check: action, command, result: { status: result.status, exitCode: result.exitCode, reason: result.reason, output: result.status === 'FAILED' && !diagnostics.length ? summarizeOutput(`${result.stdout}\n${result.stderr}`, 20) : undefined }, diagnostics }, flags.json);
+    }
+    throw new Error(`Unknown quality action: ${action}`);
+  }
+
   handleVerify(action, subject, flags) {
     if (action !== 'architecture') throw new Error(`Unknown verify action: ${action}`);
     const root = serviceRoot(this.cwd, flags);
-    const issues = [];
-    const scanRoot = srcRoot(root);
-    if (exists(scanRoot)) {
-      const files = [];
-      const walk = (dir) => {
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-          const full = path.join(dir, entry.name);
-          if (entry.isDirectory()) walk(full);
-          else if (/\.tsx?$/.test(entry.name)) files.push(full);
-        }
-      };
-      walk(scanRoot);
-      for (const file of files) {
-        const text = fs.readFileSync(file, 'utf8');
-        const relative = rel(root, file);
-        if (relative.includes('/Domain/') && /from ['"][^'"]*(express|routing-controllers|mongodb|typeorm|redis|aws|jsonwebtoken|jwks|winston)/.test(text)) {
-          issues.push({ severity: 'critical', file: relative, rule: 'domain-must-not-import-infrastructure' });
-        }
-        if (relative.includes('/Application/') && /from ['"][^'"]*(express|routing-controllers|mongodb|typeorm|redis|aws|jsonwebtoken|jwks|winston)/.test(text)) {
-          issues.push({ severity: 'major', file: relative, rule: 'application-must-not-import-concrete-infrastructure' });
-        }
-        if (/from ['"](?:\.\.\/){4,}/.test(text)) {
-          issues.push({ severity: 'minor', file: relative, rule: 'possible-cross-boundary-relative-import' });
-        }
-      }
-    }
-    const inv = loadInventory(root);
-    return this.output({ status: issues.length ? 'WARNING' : 'OK', check: 'architecture', issues, inventory: { path: rel(root, inventoryPath(root)), entities: Object.keys(inv.entities).length } }, flags.json);
+    return this.output(verifyArchitecture(root), flags.json);
   }
 }
