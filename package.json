@@ -1,7 +1,7 @@
 {
   "name": "ahre-cli",
-  "version": "0.3.4",
-  "description": "AhRE - ArcHitecture Recipe Engine CLI with recipes, AST patching, installable skills, semantic inventory, graph, search, build planning, and minimal GitHub installer",
+  "version": "0.3.5",
+  "description": "AhRE - ArcHitecture Recipe Engine CLI with recipes, AST patching, installable skills, semantic inventory, graph, search, build planning, and minimal GitHub installer and .agents skill bootstrap",
   "type": "module",
   "bin": {
     "ahre": "./bin/ahre.mjs"

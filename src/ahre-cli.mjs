@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-const VERSION = '0.3.4';
+const VERSION = '0.3.5';
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const INTENTS = [
@@ -95,7 +95,7 @@ const INTENTS = [
   {
     name: 'skill.install',
     kind: 'llm-integration',
-    description: 'Install the AhRE usage SKILL into a project, global AhRE home, known agent target, or explicit path.',
+    description: 'Install the AhRE usage SKILL into .agents by default, optionally another target/path, and bootstrap AGENTS.md.',
     idempotent: true,
     safeByDefault: true
   },
@@ -783,9 +783,10 @@ function resolveBundledSkill(id) {
 }
 
 function skillInstallDir(root, flags) {
+  if (flags.path || flags.to) return path.resolve(root, flags.path || flags.to);
   const target = flags.target || 'project';
-  if (target === 'project') return path.join(root, '.ahre', 'skills');
-  if (target === 'global') return path.join(os.homedir(), '.ahre', 'skills');
+  if (target === 'project') return path.join(root, '.agents');
+  if (target === 'global') return path.join(os.homedir(), '.agents');
   if (target === 'path') {
     if (!flags.path && !flags.to) throw new Error('skill install --target path requires --path or --to');
     return path.resolve(root, flags.path || flags.to);
@@ -809,6 +810,62 @@ function loadSkillManifest(manifestFile) {
   return manifest;
 }
 
+const AGENTS_AHRE_BLOCK_START = '<!-- AHRE_USAGE_SKILL_START -->';
+const AGENTS_AHRE_BLOCK_END = '<!-- AHRE_USAGE_SKILL_END -->';
+
+function agentsAhreBlock(installedPath) {
+  return `${AGENTS_AHRE_BLOCK_START}
+## AhRE usage skill
+
+This project has the AhRE usage skill installed at:
+
+\`${installedPath}\`
+
+When developing code in this repository, agents must discover and apply that skill before manually creating, modifying, wiring, searching, or verifying architecture/code artifacts.
+
+Prefer AhRE intents and recipes over manual boilerplate when available:
+
+\`\`\`bash
+ahre intents search "<task>" --json
+ahre recipe plan <recipe> --json
+ahre recipe apply <recipe> --json
+ahre inventory get <kind> <id> --json
+ahre verify architecture --json
+\`\`\`
+
+Use manual implementation only when AhRE has no applicable intent/recipe or when business-specific logic must be written by the model/developer.
+${AGENTS_AHRE_BLOCK_END}`;
+}
+
+function ensureAgentsMdForAhre(root, installedPath) {
+  const file = path.join(root, 'AGENTS.md');
+  const block = agentsAhreBlock(installedPath);
+  const existed = exists(file);
+  if (!existed) {
+    const content = `# AGENTS.md
+
+This file provides repository-level instructions for coding agents.
+
+${block}
+`;
+    fs.writeFileSync(file, content);
+    return { status: 'CREATED', path: rel(root, file) };
+  }
+  const current = fs.readFileSync(file, 'utf8');
+  if (current.includes(AGENTS_AHRE_BLOCK_START) && current.includes(AGENTS_AHRE_BLOCK_END)) {
+    const pattern = new RegExp(`${AGENTS_AHRE_BLOCK_START}[\\s\\S]*?${AGENTS_AHRE_BLOCK_END}`);
+    const next = current.replace(pattern, block);
+    if (next !== current) {
+      fs.writeFileSync(file, next.endsWith('\n') ? next : `${next}\n`);
+      return { status: 'UPDATED', path: rel(root, file) };
+    }
+    return { status: 'EXISTS', path: rel(root, file) };
+  }
+  const next = `${current.trimEnd()}\n\n${block}\n`;
+  fs.writeFileSync(file, next);
+  return { status: 'APPENDED', path: rel(root, file) };
+}
+
 function installSkill({ root, skill, flags }) {
   if (skill.group === 'authoring' && !flags['allow-authoring-skills'] && !flags.explicit) {
     return {
@@ -827,16 +884,18 @@ function installSkill({ root, skill, flags }) {
 
   const manifestFile = path.join(targetDir, 'manifest.json');
   const manifest = loadSkillManifest(manifestFile);
+  const installedPath = rel(root, dest);
   manifest.installed[skill.name] = {
     version: VERSION,
     source: 'ahre-cli',
     group: skill.group,
-    target: flags.target || 'project',
-    path: rel(root, dest),
+    target: flags.target || (flags.path || flags.to ? 'path' : 'project'),
+    path: installedPath,
     installedAt: new Date().toISOString()
   };
   writeJson(manifestFile, manifest);
-  return { status: 'OK', action: status, skill: { name: skill.name, description: skill.description, group: skill.group }, installedPath: rel(root, dest), manifestPath: rel(root, manifestFile) };
+  const agentsMd = flags['no-agents-md'] ? null : ensureAgentsMdForAhre(root, installedPath);
+  return { status: 'OK', action: status, skill: { name: skill.name, description: skill.description, group: skill.group }, installedPath, manifestPath: rel(root, manifestFile), agentsMd };
 }
 
 export class AhreCli {

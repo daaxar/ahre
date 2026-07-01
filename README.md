@@ -206,30 +206,54 @@ node ./bin/ahre.mjs skill show usage --json
 Install the usage skill into the current project:
 
 ```bash
-node ./bin/ahre.mjs skill install usage --target project --json
+node ./bin/ahre.mjs skill install usage --json
 ```
 
 This creates:
 
 ```txt
-.ahre/skills/ahre-usage/SKILL.md
-.ahre/skills/manifest.json
+.agents/ahre-usage/SKILL.md
+.agents/manifest.json
+AGENTS.md
 ```
 
 Run doctor:
 
 ```bash
-node ./bin/ahre.mjs skill doctor --target project --json
+node ./bin/ahre.mjs skill doctor --json
 ```
 
 Supported targets:
 
-- `project` → `.ahre/skills`
-- `global` → `~/.ahre/skills`
+- `project` → `.agents`
+- `global` → `~/.agents`
 - `path` → explicit `--path` or `--to`
 - `claude` → `.claude/skills`
 - `codex` → `.codex/skills`
 - `opencode` → `.opencode/skills`
+
+
+### AGENTS.md bootstrap
+
+When installing the usage skill, AhRE also ensures an `AGENTS.md` file exists at the project root.
+
+- If `AGENTS.md` does not exist, AhRE creates a minimal one.
+- If `AGENTS.md` already exists, AhRE appends an idempotent AhRE block.
+- If the AhRE block already exists, AhRE updates it in place.
+
+The block tells coding agents to discover and use the installed AhRE usage skill before manually creating, modifying, wiring, searching, or verifying code artifacts.
+
+Override the skill destination with:
+
+```bash
+node ./bin/ahre.mjs skill install usage --to ./custom/skills --json
+```
+
+Skip `AGENTS.md` bootstrap only when intentionally managing agent instructions elsewhere:
+
+```bash
+node ./bin/ahre.mjs skill install usage --no-agents-md --json
+```
 
 ## Authoring skills
 
@@ -287,4 +311,4 @@ Execution preference for models:
 
 ## Version
 
-Current version: `0.3.4`.
+Current version: `0.3.5`.
