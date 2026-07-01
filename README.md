@@ -1,202 +1,253 @@
 # AhRE CLI — ArcHitecture Recipe Engine
 
-AhRE is a CLI-first Architecture Recipe Engine for LLM-assisted software delivery.
+AhRE is a CLI-first architecture automation engine for LLM-assisted development.
 
-It does not ask the model to generate repetitive boilerplate. The model declares desired architectural capabilities and AhRE converges the repository toward that state with idempotent recipes, semantic inventory, AST-aware edits, and low-token JSON reports.
+It executes composable, idempotent intents that converge a repository toward a desired architectural state, then returns compact JSON with effects, inventory, graph, and current semantic knowledge.
 
-## Version 0.2 highlights
+The CLI is designed for repositories that use Clean Architecture, Hexagonal Architecture, DDD, CQRS, event-driven messaging, explicit dependency injection, and monorepo boundaries.
 
-- Macro-to-micro composable intents.
-- `plan` before `apply` for large recipes.
-- `ensure` semantics for idempotent convergence.
-- `ts-morph` support for TypeScript method insertion.
-- Fallback text patching when `ts-morph` is not installed.
-- Semantic inventory for low-token LLM context.
-- Dependency graph generation for future build-cache workflows.
-- `build plan` primitive for affected-file analysis.
-- `search code` over graph + inventory.
-- Agent-friendly `code` namespace aliases.
-- Compact JSON output designed for agents.
+## What AhRE does
 
-## Install locally
+AhRE is not just a file generator.
+
+It provides:
+
+- macro recipes;
+- component recipes;
+- micro-intents;
+- AST-aware TypeScript edits with `ts-morph` when installed;
+- conservative fallback patching;
+- semantic inventory;
+- dependency graph;
+- build-impact planning;
+- code search;
+- architecture verification;
+- installable LLM usage skill;
+- non-default authoring skills for extending AhRE itself.
+
+## Install dependencies
 
 ```bash
 npm install
-npm install -g .
 ```
 
-Or run directly:
+`ts-morph` is declared as a dependency. Without it, AhRE still works for many operations but reports when it falls back to conservative text patching.
+
+## Basic commands
 
 ```bash
-node ./bin/ahre.mjs --help
+node ./bin/ahre.mjs --version --json
+node ./bin/ahre.mjs intents list --json
+node ./bin/ahre.mjs intents search "entity create http mongo" --json
+node ./bin/ahre.mjs intents describe entity.capability.ensure --json
 ```
 
-`ts-morph` is declared as a dependency. After `npm install`, AhRE uses AST patching for supported TypeScript micro-intents.
+## Recipe plan/apply
 
-## Core commands
-
-### Discover available intents
+Plan first:
 
 ```bash
-ahre intents list --json
-ahre intents search entity --json
-ahre intents describe entity.capability.ensure --json
-```
-
-### Plan a macro recipe
-
-```bash
-ahre recipe plan entity.capability.ensure \
+node ./bin/ahre.mjs recipe plan entity.capability.ensure \
   --entity User \
   --context Users \
   --json
 ```
 
-### Apply a macro recipe
+Apply:
 
 ```bash
-ahre recipe apply entity.capability.ensure \
+node ./bin/ahre.mjs recipe apply entity.capability.ensure \
   --entity User \
   --context Users \
   --json
 ```
 
-This ensures, when missing:
+The recipe ensures, when missing:
 
-- shared `AggregateRoot` and `Uuid` base classes;
-- bounded context folders;
-- `User` aggregate skeleton;
-- `UserId` value object;
-- `UserRepository` domain interface;
-- `CreateUser` application use case;
-- `UserController` HTTP adapter;
-- `MongoUserRepository` persistence adapter;
-- `UserWasCreated` domain event;
-- Jest and Cucumber skeleton tests;
-- DI placeholder in `config/container/services.yaml`;
-- `.ahre/inventory.json` semantic inventory.
+- context folders;
+- `AggregateRoot`;
+- base `Uuid` value object;
+- aggregate/entity skeleton;
+- id value object;
+- repository interface;
+- create use case;
+- HTTP controller;
+- Mongo repository skeleton;
+- domain event skeleton;
+- unit/API test skeletons;
+- DI placeholder;
+- semantic inventory.
 
-### Use the `code` namespace
+## Code namespace
 
-The `code` namespace is an agent-friendly alias over recipe and ensure primitives.
-
-```bash
-ahre code capability --entity User --context Users --json
-ahre code method --entity User --context Users --method changeEmail --json
-```
-
-### Add a micro-intent later with AST support
+The `code` namespace is a LLM-friendly alias over recipe and ensure operations.
 
 ```bash
-ahre ensure method \
-  --entity User \
-  --context Users \
-  --method changeEmail \
-  --kind behavior \
-  --params "email: UserEmail" \
-  --returns void \
-  --json
+node ./bin/ahre.mjs code capability --entity User --context Users --json
+node ./bin/ahre.mjs code method --entity User --context Users --method changeEmail --params "email: UserEmail" --returns void --json
 ```
 
-When `ts-morph` is installed, AhRE edits the class through the TypeScript AST. If `ts-morph` is unavailable, AhRE falls back to conservative text patching and reports a warning.
+## Inventory
 
-### Query semantic inventory
+AhRE maintains `.ahre/inventory.json` as a semantic cache.
 
 ```bash
-ahre inventory get entity Users.User --json
-ahre inventory list entities --json
+node ./bin/ahre.mjs inventory get entity Users.User --json
+node ./bin/ahre.mjs inventory list entities --json
+node ./bin/ahre.mjs inventory rebuild --json
 ```
 
-### Build dependency graph
+Inventory is not the source of truth. Source code is. Inventory exists to give LLMs compact context.
+
+## Dependency graph and build planning
+
+Build the graph:
 
 ```bash
-ahre graph build --json
-ahre graph get file src/Users/Domain/Model/User.ts --json
-ahre graph affected src/Users/Domain/Model/User.ts --json
+node ./bin/ahre.mjs graph build --json
 ```
 
-The graph is stored at:
+Inspect a file node:
+
+```bash
+node ./bin/ahre.mjs graph get file src/Users/Domain/Model/User.ts --json
+```
+
+List affected files:
+
+```bash
+node ./bin/ahre.mjs graph affected src/Users/Domain/Model/User.ts --json
+```
+
+Plan build impact:
+
+```bash
+node ./bin/ahre.mjs build plan --changed src/Users/Domain/Model/User.ts --json
+```
+
+This version does not execute compilation yet. It calculates impacted files and preliminary cache keys.
+
+## Search
+
+```bash
+node ./bin/ahre.mjs search code User --json
+node ./bin/ahre.mjs search code changeEmail --json
+```
+
+Search uses graph and inventory context.
+
+## Verify architecture
+
+```bash
+node ./bin/ahre.mjs verify architecture --json
+```
+
+Current checks include low-cost import rules for Domain/Application layers and cross-boundary relative import hints.
+
+## LLM Skill installation
+
+AhRE bundles a user-facing SKILL for LLMs. This skill teaches the model how to use AhRE, not how to modify AhRE internals.
+
+List installable skills:
+
+```bash
+node ./bin/ahre.mjs skill list --json
+```
+
+List all bundled skills, including non-default authoring skills:
+
+```bash
+node ./bin/ahre.mjs skill list --all --json
+```
+
+Show the usage skill:
+
+```bash
+node ./bin/ahre.mjs skill show usage --json
+```
+
+Install the usage skill into the current project:
+
+```bash
+node ./bin/ahre.mjs skill install usage --target project --json
+```
+
+This creates:
 
 ```txt
-.ahre/graph.json
+.ahre/skills/ahre-usage/SKILL.md
+.ahre/skills/manifest.json
 ```
 
-It contains:
-
-- files;
-- hashes;
-- imports;
-- reverse dependencies;
-- classes;
-- methods;
-- symbols;
-- preliminary cache keys.
-
-### Plan affected build scope
+Run doctor:
 
 ```bash
-ahre build plan --changed src/Users/Domain/Model/User.ts --json
+node ./bin/ahre.mjs skill doctor --target project --json
 ```
 
-This does not compile yet. It returns the impacted files and cache keys that a future cached build executor can use.
+Supported targets:
 
-### Search code and inventory
+- `project` → `.ahre/skills`
+- `global` → `~/.ahre/skills`
+- `path` → explicit `--path` or `--to`
+- `claude` → `.claude/skills`
+- `codex` → `.codex/skills`
+- `opencode` → `.opencode/skills`
+
+## Authoring skills
+
+AhRE also bundles authoring skills for developers extending AhRE itself:
+
+- `authoring.recipe`
+- `authoring.template`
+- `authoring.intent`
+- `authoring.inventory`
+- `authoring.mcp`
+
+These are **not installed by default**.
+
+Show one:
 
 ```bash
-ahre search code User --json
+node ./bin/ahre.mjs skill show authoring.recipe --json
 ```
 
-### Verify architecture cheaply
+Export one:
 
 ```bash
-ahre verify architecture --json
+node ./bin/ahre.mjs skill export authoring.recipe --to ./docs/skills --json
 ```
 
-## Design principles
-
-### Recipes are convergent
-
-A recipe describes desired state. AhRE creates missing artifacts, leaves valid existing artifacts alone, patches only safe placeholders, and blocks on conflicts.
-
-### Everything is an intent
-
-A macro recipe and a micro action are both intents. A macro intent can call component intents, which can call internal intents.
-
-### Inventory is context for LLMs
-
-Every apply command returns:
-
-- effects: created, updated, existing, skipped, blocked;
-- inventory delta;
-- current semantic knowledge;
-- suggested next intents.
-
-The LLM should not reread the whole repository when it can query inventory.
-
-### Graph is context for build and navigation
-
-The dependency graph starts early because it is useful before a full build cache exists. It lets agents answer:
-
-- what imports this file;
-- what classes and methods exist;
-- what files are affected by a change;
-- what cache keys could be used later.
-
-### Inventory is not the source of truth
-
-The source of truth remains code. Inventory and graph files are caches that can be rebuilt or verified.
-
-## Example flow
+Installing authoring skills requires an explicit flag:
 
 ```bash
-mkdir demo-service
-cd demo-service
-ahre recipe plan entity.capability.ensure --entity User --context Users --json
-ahre recipe apply entity.capability.ensure --entity User --context Users --json
-ahre ensure method --entity User --context Users --method changeEmail --params "email: UserEmail" --json
-ahre graph build --json
-ahre build plan --changed src/Users/Domain/Model/User.ts --json
-ahre search code User --json
-ahre inventory get entity Users.User --json
-ahre verify architecture --json
+node ./bin/ahre.mjs skill install authoring.recipe \
+  --target project \
+  --allow-authoring-skills \
+  --json
 ```
+
+This friction is intentional. Normal project users need the AhRE usage skill, not framework-authoring instructions.
+
+## Recommended LLM integration
+
+Preferred integration stack:
+
+```txt
+AGENTS.md      → governs pipeline and gates
+AhRE SKILL     → teaches when/how to use AhRE
+MCP server     → exposes AhRE as typed tools, when available
+AhRE CLI       → portable execution backend and fallback
+Inventory      → compact semantic context
+Graph          → dependency/build context
+```
+
+Execution preference for models:
+
+1. Use AhRE MCP tools if available.
+2. Otherwise use AhRE CLI with `--json`.
+3. Otherwise implement manually using project architecture skills and report the gap.
+
+## Version
+
+Current version: `0.3.0`.

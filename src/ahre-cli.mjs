@@ -1,8 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
+const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const INTENTS = [
   {
@@ -86,6 +89,20 @@ const INTENTS = [
     name: 'search.code',
     kind: 'navigation',
     description: 'Search indexed files, symbols, classes, methods, and inventory entries using AhRE graph/inventory context.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'skill.install',
+    kind: 'llm-integration',
+    description: 'Install the AhRE usage SKILL into a project, global AhRE home, known agent target, or explicit path.',
+    idempotent: true,
+    safeByDefault: true
+  },
+  {
+    name: 'skill.show',
+    kind: 'llm-integration',
+    description: 'Show bundled AhRE usage or authoring SKILL content. Authoring skills are not installed by default.',
     idempotent: true,
     safeByDefault: true
   }
@@ -691,6 +708,136 @@ function searchGraphAndInventory(root, query) {
   return results.slice(0, 50);
 }
 
+
+function skillSourceRoot() {
+  return path.join(PACKAGE_ROOT, 'skills');
+}
+
+function parseSkillFrontmatter(text) {
+  if (!text.startsWith('---\n')) return { data: {}, body: text };
+  const end = text.indexOf('\n---\n', 4);
+  if (end === -1) return { data: {}, body: text };
+  const raw = text.slice(4, end).trim().split(/\r?\n/);
+  const data = {};
+  for (const line of raw) {
+    const idx = line.indexOf(':');
+    if (idx === -1) continue;
+    const key = line.slice(0, idx).trim();
+    let value = line.slice(idx + 1).trim();
+    value = value.replace(/^['"]|['"]$/g, '');
+    data[key] = value;
+  }
+  return { data, body: text.slice(end + 5) };
+}
+
+function listBundledSkills({ includeAuthoring = false } = {}) {
+  const root = skillSourceRoot();
+  const groups = includeAuthoring ? ['installable', 'authoring'] : ['installable'];
+  const skills = [];
+  for (const group of groups) {
+    const dir = path.join(root, group);
+    if (!exists(dir)) continue;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const skillFile = path.join(dir, entry.name, 'SKILL.md');
+      if (!exists(skillFile)) continue;
+      const content = fs.readFileSync(skillFile, 'utf8');
+      const { data } = parseSkillFrontmatter(content);
+      skills.push({
+        id: group === 'authoring' ? `authoring.${entry.name.replace(/^ahre-|-authoring$/g, '')}` : entry.name.replace(/^ahre-/, ''),
+        group,
+        directory: entry.name,
+        name: data.name || entry.name,
+        description: data.description || '',
+        installable: group === 'installable',
+        path: rel(PACKAGE_ROOT, skillFile)
+      });
+    }
+  }
+  return skills.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function resolveBundledSkill(id) {
+  const normalized = String(id || 'usage');
+  const candidates = [];
+  if (normalized === 'usage' || normalized === 'ahre-usage') candidates.push(path.join(skillSourceRoot(), 'installable', 'ahre-usage', 'SKILL.md'));
+  if (normalized.startsWith('authoring.')) {
+    const name = normalized.slice('authoring.'.length);
+    candidates.push(path.join(skillSourceRoot(), 'authoring', `ahre-${name}-authoring`, 'SKILL.md'));
+  }
+  candidates.push(path.join(skillSourceRoot(), 'installable', normalized, 'SKILL.md'));
+  candidates.push(path.join(skillSourceRoot(), 'authoring', normalized, 'SKILL.md'));
+  const found = candidates.find((file) => exists(file));
+  if (!found) return null;
+  const content = fs.readFileSync(found, 'utf8');
+  const { data } = parseSkillFrontmatter(content);
+  return {
+    id: normalized,
+    group: found.includes(`${path.sep}authoring${path.sep}`) ? 'authoring' : 'installable',
+    file: found,
+    content,
+    name: data.name || path.basename(path.dirname(found)),
+    description: data.description || ''
+  };
+}
+
+function skillInstallDir(root, flags) {
+  const target = flags.target || 'project';
+  if (target === 'project') return path.join(root, '.ahre', 'skills');
+  if (target === 'global') return path.join(os.homedir(), '.ahre', 'skills');
+  if (target === 'path') {
+    if (!flags.path && !flags.to) throw new Error('skill install --target path requires --path or --to');
+    return path.resolve(root, flags.path || flags.to);
+  }
+  if (target === 'claude') return path.join(root, '.claude', 'skills');
+  if (target === 'codex') return path.join(root, '.codex', 'skills');
+  if (target === 'opencode') return path.join(root, '.opencode', 'skills');
+  throw new Error(`Unknown skill target: ${target}`);
+}
+
+function skillManifestPath(rootOrTargetDir, flags = {}) {
+  if (flags && flags.target && flags.target !== 'project') return path.join(rootOrTargetDir, 'manifest.json');
+  return path.join(rootOrTargetDir, '.ahre', 'skills', 'manifest.json');
+}
+
+function loadSkillManifest(manifestFile) {
+  const manifest = readJson(manifestFile, { schemaVersion: 1, generator: 'AhRE', installed: {} });
+  manifest.schemaVersion ??= 1;
+  manifest.generator ??= 'AhRE';
+  manifest.installed ??= {};
+  return manifest;
+}
+
+function installSkill({ root, skill, flags }) {
+  if (skill.group === 'authoring' && !flags['allow-authoring-skills'] && !flags.explicit) {
+    return {
+      status: 'BLOCKED',
+      reason: 'Authoring skills are not installable by default. Re-run with --allow-authoring-skills or --explicit if you really want to install framework-authoring guidance into this target.',
+      skill: { name: skill.name, group: skill.group }
+    };
+  }
+  const targetDir = skillInstallDir(root, flags);
+  const skillDir = path.join(targetDir, skill.name);
+  const dest = path.join(skillDir, 'SKILL.md');
+  ensureDir(skillDir);
+  const previous = exists(dest) ? fs.readFileSync(dest, 'utf8') : null;
+  const status = previous === skill.content ? 'EXISTS' : previous ? 'UPDATED' : 'CREATED';
+  if (previous !== skill.content) fs.writeFileSync(dest, skill.content);
+
+  const manifestFile = path.join(targetDir, 'manifest.json');
+  const manifest = loadSkillManifest(manifestFile);
+  manifest.installed[skill.name] = {
+    version: VERSION,
+    source: 'ahre-cli',
+    group: skill.group,
+    target: flags.target || 'project',
+    path: rel(root, dest),
+    installedAt: new Date().toISOString()
+  };
+  writeJson(manifestFile, manifest);
+  return { status: 'OK', action: status, skill: { name: skill.name, description: skill.description, group: skill.group }, installedPath: rel(root, dest), manifestPath: rel(root, manifestFile) };
+}
+
 export class AhreCli {
   constructor({ cwd }) {
     this.cwd = cwd;
@@ -711,12 +858,13 @@ export class AhreCli {
     if (group === 'graph') return await this.handleGraph(action, subject, maybe, flags);
     if (group === 'build') return await this.handleBuild(action, subject, maybe, flags);
     if (group === 'search') return await this.handleSearch(action, subject, maybe, flags);
+    if (group === 'skill') return this.handleSkill(action, subject, maybe, flags);
 
     throw new Error(`Unknown command group: ${group}`);
   }
 
   help() {
-    console.log(`AhRE — ArcHitecture Recipe Engine CLI ${VERSION}\n\nUsage:\n  ahre intents list --json\n  ahre intents search <query> --json\n  ahre intents describe <intent> --json\n\n  ahre recipe plan entity.capability.ensure --entity User --context Users --json\n  ahre recipe apply entity.capability.ensure --entity User --context Users --json\n\n  ahre ensure entity --entity User --context Users --json\n  ahre ensure method --entity User --context Users --method changeEmail --json\n\n  ahre inventory get entity Users.User --json\n  ahre inventory list entities --json\n  ahre verify architecture --json\n`);
+    console.log(`AhRE — ArcHitecture Recipe Engine CLI ${VERSION}\n\nUsage:\n  ahre intents list --json\n  ahre intents search <query> --json\n  ahre intents describe <intent> --json\n\n  ahre recipe plan entity.capability.ensure --entity User --context Users --json\n  ahre recipe apply entity.capability.ensure --entity User --context Users --json\n\n  ahre ensure entity --entity User --context Users --json\n  ahre ensure method --entity User --context Users --method changeEmail --json\n\n  ahre inventory get entity Users.User --json\n  ahre inventory list entities --json\n  ahre verify architecture --json\n\n  ahre skill list --all --json\n  ahre skill show usage --json\n  ahre skill install usage --target project --json\n  ahre skill doctor --target project --json\n`);
   }
 
   output(payload, asJson = false) {
@@ -959,6 +1107,56 @@ export class AhreCli {
     if (!readGraph(root) && exists(srcRoot(root))) await buildDependencyGraph(root);
     const results = searchGraphAndInventory(root, query);
     return this.output({ status: 'OK', intent: 'search.code', query, resultCount: results.length, results }, flags.json);
+  }
+
+
+  handleSkill(action, subject, maybe, flags) {
+    const root = serviceRoot(this.cwd, flags);
+    if (action === 'list') {
+      const skills = listBundledSkills({ includeAuthoring: Boolean(flags.all) });
+      return this.output({ status: 'OK', skills, note: flags.all ? 'Includes non-installable authoring skills.' : 'Default list includes installable user-facing skills only. Use --all to include authoring skills.' }, flags.json);
+    }
+    if (action === 'show' || action === 'print') {
+      const id = subject || 'usage';
+      const skill = resolveBundledSkill(id);
+      if (!skill) return this.output({ status: 'NOT_FOUND', id }, flags.json);
+      if (flags.json) return this.output({ status: 'OK', id, name: skill.name, description: skill.description, group: skill.group, installable: skill.group === 'installable', content: skill.content }, true);
+      console.log(skill.content);
+      return;
+    }
+    if (action === 'export') {
+      const id = subject || 'usage';
+      const skill = resolveBundledSkill(id);
+      if (!skill) return this.output({ status: 'NOT_FOUND', id }, flags.json);
+      const to = flags.to || flags.path;
+      if (!to) throw new Error('skill export requires --to <dir>');
+      const destDir = path.resolve(root, to, skill.name);
+      ensureDir(destDir);
+      const dest = path.join(destDir, 'SKILL.md');
+      fs.writeFileSync(dest, skill.content);
+      return this.output({ status: 'OK', action: 'EXPORTED', skill: skill.name, group: skill.group, path: rel(root, dest) }, flags.json);
+    }
+    if (action === 'install') {
+      const id = subject || 'usage';
+      const skill = resolveBundledSkill(id);
+      if (!skill) return this.output({ status: 'NOT_FOUND', id }, flags.json);
+      const result = installSkill({ root, skill, flags });
+      return this.output(result, flags.json);
+    }
+    if (action === 'doctor') {
+      const targetDir = skillInstallDir(root, flags);
+      const manifestFile = path.join(targetDir, 'manifest.json');
+      const manifest = loadSkillManifest(manifestFile);
+      const installed = Object.entries(manifest.installed || {}).map(([name, value]) => ({ name, ...value }));
+      const authoringSkillsInstalled = installed.some((item) => item.group === 'authoring');
+      const issues = [];
+      for (const item of installed) {
+        const full = path.resolve(root, item.path || '');
+        if (item.path && !exists(full) && !exists(path.join(targetDir, item.name, 'SKILL.md'))) issues.push({ severity: 'warning', skill: item.name, reason: 'manifest entry points to a missing file' });
+      }
+      return this.output({ status: issues.length ? 'WARNING' : 'OK', target: flags.target || 'project', targetDir: rel(root, targetDir), manifestPath: rel(root, manifestFile), installed, authoringSkillsInstalled, issues }, flags.json);
+    }
+    throw new Error(`Unknown skill action: ${action}`);
   }
 
   handleVerify(action, subject, flags) {
