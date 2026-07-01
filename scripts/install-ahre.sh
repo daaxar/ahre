@@ -1,21 +1,20 @@
 #!/usr/bin/env sh
 set -eu
 
-# AhRE installer bootstrap.
-# Intended to be hosted as a GitHub Gist raw file and executed with:
-#   curl -fsSL https://gist.githubusercontent.com/<owner>/<gist-id>/raw/install-ahre.sh | sh -s -- --dist-url https://gist.githubusercontent.com/<owner>/<gist-id>/raw/ahre-cli-v0.3.1.zip --install-skill
+# AhRE user-local installer bootstrap.
+# Host this file as GitHub Gist raw or GitHub raw content, then run:
+#   curl -fsSL <raw-install-ahre.sh> | sh -s -- --dist-url <raw-ahre-cli.zip> --install-skill
 #
-# Environment overrides:
-#   AHRE_DIST_URL      URL to the AhRE ZIP distribution.
-#   AHRE_INSTALL_DIR   Install directory. Default: $HOME/.ahre/cli/current
-#   AHRE_BIN_DIR       Directory for the global wrapper. Default: $HOME/.local/bin
-#   AHRE_METHOD        user-bin | npm-global. Default: user-bin
+# Defaults:
+#   install dir: $HOME/.local/.ahre
+#   bin dir:     $HOME/.local/bin
+#
+# The AhRE CLI is intentionally agnostic to this installer.
 
-AHRE_VERSION="0.3.1"
+AHRE_VERSION="0.3.2"
 AHRE_DIST_URL="${AHRE_DIST_URL:-}"
-AHRE_INSTALL_DIR="${AHRE_INSTALL_DIR:-$HOME/.ahre/cli/current}"
+AHRE_INSTALL_DIR="${AHRE_INSTALL_DIR:-$HOME/.local/.ahre}"
 AHRE_BIN_DIR="${AHRE_BIN_DIR:-$HOME/.local/bin}"
-AHRE_METHOD="${AHRE_METHOD:-user-bin}"
 AHRE_INSTALL_SKILL="0"
 AHRE_SKIP_DEPS="0"
 
@@ -28,16 +27,15 @@ Usage:
 
 Options:
   --dist-url <url>       AhRE ZIP distribution URL. Can also be AHRE_DIST_URL.
-  --install-dir <dir>    Install directory for user-bin mode. Default: ~/.ahre/cli/current
-  --bin-dir <dir>        Global wrapper directory for user-bin mode. Default: ~/.local/bin
-  --method <method>      user-bin | npm-global. Default: user-bin
+  --install-dir <dir>    Install directory. Default: \$HOME/.local/.ahre
+  --bin-dir <dir>        Wrapper directory. Default: \$HOME/.local/bin
   --install-skill        Also install AhRE usage SKILL globally after CLI installation.
-  --skip-deps            Skip npm install --omit=dev in user-bin mode.
+  --skip-deps            Skip npm install --omit=dev.
   -h, --help             Show help.
 
 Examples:
-  curl -fsSL <gist-raw-install-url> | sh -s -- --dist-url <gist-raw-zip-url> --install-skill
-  AHRE_DIST_URL=<gist-raw-zip-url> sh install-ahre.sh --install-skill
+  curl -fsSL <gist-or-github-raw-install-url> | sh -s -- --dist-url <gist-or-github-raw-zip-url> --install-skill
+  AHRE_DIST_URL=<zip-url> sh install-ahre.sh --install-skill
 USAGE
 }
 
@@ -49,8 +47,6 @@ while [ "$#" -gt 0 ]; do
       AHRE_INSTALL_DIR="$2"; shift 2 ;;
     --bin-dir)
       AHRE_BIN_DIR="$2"; shift 2 ;;
-    --method)
-      AHRE_METHOD="$2"; shift 2 ;;
     --install-skill)
       AHRE_INSTALL_SKILL="1"; shift ;;
     --skip-deps)
@@ -115,46 +111,31 @@ if [ -z "$PKG_DIR" ]; then
   exit 1
 fi
 
-case "$AHRE_METHOD" in
-  npm-global)
-    echo "Installing AhRE globally with npm from $PKG_DIR" >&2
-    npm install -g "$PKG_DIR"
-    ;;
-  user-bin)
-    echo "Installing AhRE into $AHRE_INSTALL_DIR" >&2
-    rm -rf "$AHRE_INSTALL_DIR"
-    mkdir -p "$(dirname "$AHRE_INSTALL_DIR")"
-    cp -R "$PKG_DIR" "$AHRE_INSTALL_DIR"
-    if [ "$AHRE_SKIP_DEPS" != "1" ]; then
-      echo "Installing AhRE runtime dependencies" >&2
-      (cd "$AHRE_INSTALL_DIR" && npm install --omit=dev --silent)
-    fi
-    mkdir -p "$AHRE_BIN_DIR"
-    WRAPPER="$AHRE_BIN_DIR/ahre"
-    cat > "$WRAPPER" <<WRAPPER_EOF
+echo "Installing AhRE into $AHRE_INSTALL_DIR" >&2
+rm -rf "$AHRE_INSTALL_DIR"
+mkdir -p "$(dirname "$AHRE_INSTALL_DIR")"
+cp -R "$PKG_DIR" "$AHRE_INSTALL_DIR"
+
+if [ "$AHRE_SKIP_DEPS" != "1" ]; then
+  echo "Installing AhRE runtime dependencies" >&2
+  (cd "$AHRE_INSTALL_DIR" && npm install --omit=dev --silent)
+fi
+
+mkdir -p "$AHRE_BIN_DIR"
+WRAPPER="$AHRE_BIN_DIR/ahre"
+cat > "$WRAPPER" <<WRAPPER_EOF
 #!/usr/bin/env sh
 exec node "$AHRE_INSTALL_DIR/bin/ahre.mjs" "\$@"
 WRAPPER_EOF
-    chmod +x "$WRAPPER"
-    ;;
-  *)
-    echo "Unknown install method: $AHRE_METHOD" >&2
-    exit 2
-    ;;
-esac
+chmod +x "$WRAPPER"
 
-if ! command -v ahre >/dev/null 2>&1; then
-  if [ "$AHRE_METHOD" = "user-bin" ]; then
-    echo "AhRE was installed, but 'ahre' is not on PATH yet." >&2
-    echo "Add this to your shell profile:" >&2
-    echo "  export PATH=\"$AHRE_BIN_DIR:\$PATH\"" >&2
-    AHRE_CMD="$AHRE_BIN_DIR/ahre"
-  else
-    echo "AhRE install finished, but 'ahre' is not visible on PATH." >&2
-    AHRE_CMD="ahre"
-  fi
-else
+AHRE_CMD="$WRAPPER"
+if command -v ahre >/dev/null 2>&1; then
   AHRE_CMD="ahre"
+else
+  echo "AhRE was installed, but '$AHRE_BIN_DIR' may not be on PATH yet." >&2
+  echo "Add this to your shell profile if needed:" >&2
+  echo "  export PATH=\"$AHRE_BIN_DIR:\$PATH\"" >&2
 fi
 
 echo "Verifying AhRE" >&2
@@ -167,6 +148,9 @@ fi
 
 cat <<DONE
 AhRE installed successfully.
+
+Install dir:
+  $AHRE_INSTALL_DIR
 
 Command:
   $AHRE_CMD

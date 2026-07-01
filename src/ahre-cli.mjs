@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-const VERSION = '0.3.1';
+const VERSION = '0.3.2';
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const INTENTS = [
@@ -103,13 +103,6 @@ const INTENTS = [
     name: 'skill.show',
     kind: 'llm-integration',
     description: 'Show bundled AhRE usage or authoring SKILL content. Authoring skills are not installed by default.',
-    idempotent: true,
-    safeByDefault: true
-  },
-  {
-    name: 'installer.export',
-    kind: 'distribution',
-    description: 'Show or export the Gist-friendly AhRE installer script for global CLI installation.',
     idempotent: true,
     safeByDefault: true
   }
@@ -720,15 +713,6 @@ function skillSourceRoot() {
   return path.join(PACKAGE_ROOT, 'skills');
 }
 
-function installerScriptPath() {
-  return path.join(PACKAGE_ROOT, 'scripts', 'install-ahre.sh');
-}
-
-function readInstallerScript() {
-  const file = installerScriptPath();
-  if (!exists(file)) throw new Error(`Installer script not found: ${file}`);
-  return fs.readFileSync(file, 'utf8');
-}
 
 function parseSkillFrontmatter(text) {
   if (!text.startsWith('---\n')) return { data: {}, body: text };
@@ -876,8 +860,6 @@ export class AhreCli {
     if (group === 'build') return await this.handleBuild(action, subject, maybe, flags);
     if (group === 'search') return await this.handleSearch(action, subject, maybe, flags);
     if (group === 'skill') return this.handleSkill(action, subject, maybe, flags);
-    if (group === 'installer') return this.handleInstaller(action, subject, maybe, flags);
-
     throw new Error(`Unknown command group: ${group}`);
   }
 
@@ -1128,30 +1110,6 @@ export class AhreCli {
   }
 
 
-
-  handleInstaller(action, subject, maybe, flags) {
-    if (action === 'show' || action === 'print') {
-      const content = readInstallerScript();
-      if (flags.json) return this.output({ status: 'OK', installer: 'install-ahre.sh', version: VERSION, content }, true);
-      console.log(content);
-      return;
-    }
-    if (action === 'export') {
-      const to = flags.to || flags.path || subject;
-      if (!to) throw new Error('installer export requires --to <file>');
-      const root = serviceRoot(this.cwd, flags);
-      const dest = path.resolve(root, to);
-      ensureDir(path.dirname(dest));
-      fs.writeFileSync(dest, readInstallerScript());
-      fs.chmodSync(dest, 0o755);
-      return this.output({ status: 'OK', action: 'EXPORTED', installer: 'install-ahre.sh', path: rel(root, dest), mode: 'gist-bootstrap' }, flags.json);
-    }
-    if (action === 'doctor') {
-      const file = installerScriptPath();
-      return this.output({ status: exists(file) ? 'OK' : 'MISSING', installer: 'install-ahre.sh', path: rel(PACKAGE_ROOT, file), executable: exists(file) ? Boolean(fs.statSync(file).mode & 0o111) : false }, flags.json);
-    }
-    throw new Error(`Unknown installer action: ${action}`);
-  }
 
   handleSkill(action, subject, maybe, flags) {
     const root = serviceRoot(this.cwd, flags);

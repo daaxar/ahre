@@ -33,43 +33,42 @@ npm install
 
 `ts-morph` is declared as a dependency. Without it, AhRE still works for many operations but reports when it falls back to conservative text patching.
 
-## Installing from a GitHub Gist
+## Installing from GitHub Gist or GitHub raw
 
-AhRE includes a Gist-friendly installer script. The installer itself can be hosted in a GitHub Gist and install the CLI globally for the current user.
+AhRE ships an external bootstrap script at `scripts/install-ahre.sh`. The CLI itself is agnostic to the installer: there is no `ahre installer` command.
 
-Export the installer script:
-
-```bash
-node ./bin/ahre.mjs installer export --to ./dist/install-ahre.sh --json
-```
-
-Host these files in the same Gist:
+Host these files in a GitHub Gist or GitHub repository raw endpoint:
 
 ```txt
 install-ahre.sh
-ahre-cli-v0.3.1.zip
+ahre-cli-v0.3.2.zip
 ```
 
-Then users can install with:
+Install with:
 
 ```bash
-curl -fsSL https://gist.githubusercontent.com/<owner>/<gist-id>/raw/install-ahre.sh   | sh -s --       --dist-url https://gist.githubusercontent.com/<owner>/<gist-id>/raw/ahre-cli-v0.3.1.zip       --install-skill
+curl -fsSL https://gist.githubusercontent.com/<owner>/<gist-id>/raw/install-ahre.sh \
+  | sh -s -- \
+      --dist-url https://gist.githubusercontent.com/<owner>/<gist-id>/raw/ahre-cli-v0.3.2.zip \
+      --install-skill
 ```
 
-By default, the installer uses user-local global installation:
+Default user-local installation path:
 
 ```txt
-~/.ahre/cli/current
-~/.local/bin/ahre
+$HOME/.local/.ahre
+$HOME/.local/bin/ahre
 ```
 
-It can also use npm global installation:
+The same installer also works from GitHub raw URLs:
 
 ```bash
-curl -fsSL <gist-install-url>   | sh -s -- --dist-url <gist-zip-url> --method npm-global
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<ref>/install-ahre.sh \
+  | sh -s -- \
+      --dist-url https://raw.githubusercontent.com/<owner>/<repo>/<ref>/ahre-cli-v0.3.2.zip
 ```
 
-See `docs/INSTALL_FROM_GIST.md` for details.
+See `docs/INSTALL_FROM_RAW.md` for details.
 
 ## Basic commands
 
@@ -288,4 +287,4 @@ Execution preference for models:
 
 ## Version
 
-Current version: `0.3.1`.
+Current version: `0.3.2`.
