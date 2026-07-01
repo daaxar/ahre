@@ -35,36 +35,40 @@ npm install
 
 ## Installing with curl pipe sh
 
-AhRE ships an external bootstrap script at `scripts/install-ahre.sh`. The CLI itself is agnostic to installation: there is no `ahre installer` command.
+AhRE ships a minimal external installer at `scripts/install-ahre.sh`. The CLI itself is agnostic to installation. There is no `ahre installer` command.
 
-The intended user experience is a single command with no extra parameters:
-
-```bash
-curl -fsSL https://gist.githubusercontent.com/<owner>/<gist-id>/raw/install-ahre.sh | sh
-```
-
-or from GitHub raw:
+User command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<ref>/scripts/install-ahre.sh | sh
+curl -fsSL https://raw.githubusercontent.com/daaxar/ahre/main/scripts/install-ahre.sh | sh
 ```
 
-Before publishing the installer, embed the AhRE source URL inside the script by setting `AHRE_SOURCE_URL` to either a raw ZIP URL or a Git repository URL.
+The installer has no flags. It downloads:
 
-Default user-local global installation path:
+```txt
+https://github.com/daaxar/ahre/archive/refs/heads/main.zip
+```
+
+Then it unpacks into:
 
 ```txt
 $HOME/.local/.ahre
-$HOME/.local/bin/ahre
 ```
 
-The installer also installs the user-facing AhRE usage skill globally by default:
+Then it enters:
 
 ```txt
-$HOME/.ahre/skills/ahre-usage/SKILL.md
+$HOME/.local/.ahre/ahre-main
 ```
 
-See `docs/INSTALL_FROM_RAW.md` for publishing details.
+And runs:
+
+```bash
+npm install
+npm install -g .
+```
+
+See `docs/INSTALL_FROM_RAW.md` for details.
 
 ## Basic commands
 
@@ -283,4 +287,4 @@ Execution preference for models:
 
 ## Version
 
-Current version: `0.3.3`.
+Current version: `0.3.4`.
