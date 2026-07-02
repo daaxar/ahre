@@ -1,5 +1,0 @@
-{
-  "name": "xlsx.exporter.ensure",
-  "description": "Ensure XLSX exporter.",
-  "template": "document.xlsx"
-}

@@ -1,0 +1,14 @@
+{
+  "id": "tests.entity-create",
+  "description": "Create the unit test skeleton for the create use case.",
+  "required": [
+    "context",
+    "entity"
+  ],
+  "files": [
+    {
+      "source": "files/test.ts.tpl",
+      "target": "tests/unit/{{context}}/Application/UseCase/Create{{entity}}/Create{{entity}}.test.ts"
+    }
+  ]
+}

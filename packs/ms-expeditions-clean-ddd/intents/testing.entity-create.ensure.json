@@ -1,5 +1,0 @@
-{
-  "name": "testing.entity-create.ensure",
-  "description": "Ensure unit and API tests for create capability.",
-  "template": "entity.tests"
-}

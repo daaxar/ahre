@@ -1,0 +1,8 @@
+{
+  "id": "security.jwt-rbac",
+  "description": "Create JWT verifier and RBAC policy.",
+  "requires": [
+    "security.jwt",
+    "security.rbac"
+  ]
+}

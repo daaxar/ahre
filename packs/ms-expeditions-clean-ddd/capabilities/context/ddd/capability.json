@@ -1,0 +1,63 @@
+{
+  "id": "context.ddd",
+  "description": "Create only the minimal Domain and Application boundaries for a DDD bounded context.",
+  "aliases": [
+    "bounded context",
+    "ddd context",
+    "domain context"
+  ],
+  "tags": [
+    "ddd",
+    "context",
+    "domain"
+  ],
+  "required": [
+    "context"
+  ],
+  "files": [
+    {
+      "source": "files/Domain/.gitkeep.tpl",
+      "target": "src/{{context}}/Domain/.gitkeep"
+    },
+    {
+      "source": "files/Application/.gitkeep.tpl",
+      "target": "src/{{context}}/Application/.gitkeep"
+    }
+  ],
+  "suggests": [
+    {
+      "capability": "entity.create",
+      "when": "The context needs an aggregate and create use case."
+    },
+    {
+      "capability": "controller.http",
+      "when": "Expose a use case through HTTP."
+    },
+    {
+      "capability": "consumer.event",
+      "when": "Consume asynchronous events."
+    },
+    {
+      "capability": "repository.mongo",
+      "when": "Use MongoDB persistence."
+    },
+    {
+      "capability": "document.pdf",
+      "when": "Render PDF documents."
+    },
+    {
+      "capability": "document.xlsx",
+      "when": "Export XLSX documents."
+    }
+  ],
+  "alternatives": {
+    "transport": [
+      "controller.http",
+      "consumer.event"
+    ],
+    "persistence": [
+      "repository.mongo"
+    ]
+  },
+  "example": "ahre code context.ddd --context Orders --json"
+}

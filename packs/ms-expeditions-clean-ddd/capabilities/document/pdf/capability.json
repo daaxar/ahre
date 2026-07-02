@@ -1,0 +1,13 @@
+{
+  "id": "document.pdf",
+  "description": "Create PDF renderer adapter.",
+  "required": [
+    "context"
+  ],
+  "files": [
+    {
+      "source": "files/src/Context/Infrastructure/Pdf/NamePdfRenderer.ts.tpl",
+      "target": "src/{{context}}/Infrastructure/Pdf/{{name}}PdfRenderer.ts"
+    }
+  ]
+}

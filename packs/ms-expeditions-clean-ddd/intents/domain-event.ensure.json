@@ -1,5 +1,0 @@
-{
-  "name": "domain-event.ensure",
-  "description": "Ensure domain created event.",
-  "template": "entity.event"
-}

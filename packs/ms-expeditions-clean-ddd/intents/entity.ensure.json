@@ -1,5 +1,0 @@
-{
-  "name": "entity.ensure",
-  "description": "Ensure aggregate and identifier.",
-  "template": "entity.aggregate"
-}

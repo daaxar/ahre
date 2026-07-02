@@ -1,5 +1,0 @@
-{
-  "name": "service.bootstrap.ensure",
-  "description": "Ensure service entrypoint, kernel and DI container file.",
-  "template": "service.bootstrap"
-}

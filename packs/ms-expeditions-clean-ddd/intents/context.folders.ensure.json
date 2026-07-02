@@ -1,5 +1,0 @@
-{
-  "name": "context.folders.ensure",
-  "description": "Ensure bounded-context layer folders.",
-  "template": "context.ddd"
-}

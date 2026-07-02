@@ -1,5 +1,0 @@
-{
-  "name": "service.workspace.ensure",
-  "description": "Ensure service package, TypeScript and Jest configuration.",
-  "template": "service.workspace"
-}

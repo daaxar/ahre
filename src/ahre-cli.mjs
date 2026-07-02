@@ -5,7 +5,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-const VERSION = '0.8.1';
+const VERSION = '0.8.2';
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const INTENTS = [
@@ -1285,7 +1285,7 @@ function installSkill({ root, skill, flags }) {
 
 
 
-const PACK_LAYOUT = ['templates', 'intents', 'recipes', 'policies'];
+const PACK_LAYOUT = ['capabilities', 'policies'];
 
 function packSearchRoots(root) {
   return [
@@ -1295,33 +1295,28 @@ function packSearchRoots(root) {
   ];
 }
 
+function readCapabilityDirectories(base) {
+  const result = [];
+  if (!exists(base)) return result;
+  const visit = (dir) => {
+    const definition = path.join(dir, 'capability.json');
+    if (exists(definition)) result.push({ ...readJson(definition, {}), directory: dir });
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) visit(path.join(dir, entry.name));
+    }
+  };
+  visit(base);
+  return result;
+}
+
 function readPackDirectory(dir) {
   const manifestFile = path.join(dir, 'pack.json');
   if (!exists(manifestFile)) return null;
   const manifest = readJson(manifestFile, null);
   if (!manifest?.name) return null;
-  const collectJson = (folder) => {
-    const base = path.join(dir, folder);
-    if (!exists(base)) return [];
-    return fs.readdirSync(base, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
-      .map((entry) => readJson(path.join(base, entry.name), null))
-      .filter(Boolean);
-  };
-  const templateBase = path.join(dir, 'templates');
-  const templates = exists(templateBase)
-    ? fs.readdirSync(templateBase, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory() && exists(path.join(templateBase, entry.name, 'template.json')))
-        .map((entry) => ({ ...readJson(path.join(templateBase, entry.name, 'template.json'), {}), directory: entry.name }))
-    : [];
-  return {
-    ...manifest,
-    directory: dir,
-    templates,
-    intents: collectJson('intents'),
-    recipes: collectJson('recipes'),
-    policies: collectJson('policies')
-  };
+  const policyBase = path.join(dir, 'policies');
+  const policies = exists(policyBase) ? fs.readdirSync(policyBase, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith('.json')).map((entry) => readJson(path.join(policyBase, entry.name), null)).filter(Boolean) : [];
+  return { ...manifest, directory: dir, capabilities: readCapabilityDirectories(path.join(dir, 'capabilities')), policies };
 }
 
 function discoverPacks(root) {
@@ -1338,11 +1333,9 @@ function discoverPacks(root) {
 }
 
 function resolvePack(root, name) {
-  if (!name || name === ARCHITECTURE_PACK.name) {
-    const disk = discoverPacks(root).find((pack) => pack.name === ARCHITECTURE_PACK.name);
-    return disk || { ...ARCHITECTURE_PACK, directory: path.join(PACKAGE_ROOT, 'packs', ARCHITECTURE_PACK.name) };
-  }
-  return discoverPacks(root).find((pack) => pack.name === name) || null;
+  const packs = discoverPacks(root);
+  if (!name) return packs.find((pack) => pack.name === 'ms-expeditions-clean-ddd') || packs[0] || null;
+  return packs.find((pack) => pack.name === name) || null;
 }
 
 function copyDirectory(source, target) {
@@ -1360,40 +1353,14 @@ function scaffoldPack(root, name, flags = {}) {
   const base = path.resolve(root, flags.to || flags.path || 'packs');
   const dir = path.join(base, name);
   const status = exists(path.join(dir, 'pack.json')) ? 'EXISTS' : 'CREATED';
-  ensureDir(dir);
-  for (const folder of PACK_LAYOUT) ensureDir(path.join(dir, folder));
+  ensureDir(path.join(dir, 'capabilities', 'example', 'file', 'files'));
+  ensureDir(path.join(dir, 'policies'));
   if (status === 'CREATED') {
-    writeJson(path.join(dir, 'pack.json'), {
-      name,
-      version: '0.1.0',
-      description: `${name} AhRE pack`,
-      entryRecipe: 'example.ensure'
-    });
-    const templateDir = path.join(dir, 'templates', 'example.file');
-    ensureDir(path.join(templateDir, 'files', 'src'));
-    writeJson(path.join(templateDir, 'template.json'), {
-      name: 'example.file',
-      description: 'Create one example file.',
-      variables: ['Name'],
-      files: [{ source: 'files/src/__Name__.ts.tpl', target: 'src/{{Name}}.ts' }]
-    });
-    fs.writeFileSync(path.join(templateDir, 'files', 'src', '__Name__.ts.tpl'), 'export class {{Name}} {}\n');
-    writeJson(path.join(dir, 'intents', 'example.file.ensure.json'), {
-      name: 'example.file.ensure',
-      description: 'Ensure the example file.',
-      template: 'example.file'
-    });
-    writeJson(path.join(dir, 'recipes', 'example.ensure.json'), {
-      name: 'example.ensure',
-      description: 'Example recipe composed from one intent.',
-      tasks: [{ id: 'file', intent: 'example.file.ensure' }]
-    });
-    writeJson(path.join(dir, 'policies', 'default.json'), {
-      name: 'default',
-      description: 'Default pack policy.',
-      defaults: {}
-    });
-    fs.writeFileSync(path.join(dir, 'README.md'), `# ${name}\n\nAhRE pack layout:\n\n- templates/: real file trees plus template.json\n- intents/: deterministic template operations\n- recipes/: ordered task composition\n- policies/: defaults and constraints\n`);
+    writeJson(path.join(dir, 'pack.json'), { name, version: '0.1.0', description: `${name} AhRE capability pack`, layout: 'capabilities' });
+    writeJson(path.join(dir, 'capabilities', 'example', 'file', 'capability.json'), { id: 'example.file', description: 'Create one example file.', required: ['name'], files: [{ source: 'files/Name.ts.tpl', target: 'src/{{name}}.ts' }] });
+    fs.writeFileSync(path.join(dir, 'capabilities', 'example', 'file', 'files', 'Name.ts.tpl'), 'export class {{name}} {}\n');
+    writeJson(path.join(dir, 'policies', 'default.json'), { name: 'default', defaults: {} });
+    fs.writeFileSync(path.join(dir, 'README.md'), `# ${name}\n\nCapabilities live under capabilities/<id path>/capability.json.\n`);
   }
   return { status, name, path: rel(root, dir) };
 }
@@ -1402,31 +1369,25 @@ function validatePack(pack) {
   const errors = [];
   const warnings = [];
   if (!pack) return { status: 'FAILED', errors: [{ code: 'PACK_NOT_FOUND', message: 'Pack was not found.' }], warnings };
-  const names = (items) => new Set((items || []).map((item) => item.name));
-  const templateNames = names(pack.templates);
-  const intentNames = names(pack.intents);
-  const recipeNames = names(pack.recipes);
-  for (const template of pack.templates || []) {
-    if (!template.name) errors.push({ code: 'TEMPLATE_NAME_REQUIRED', file: template.directory });
-    for (const file of template.files || []) {
-      const source = path.join(pack.directory, 'templates', template.directory, file.source || '');
-      if (!file.source || !exists(source)) errors.push({ code: 'TEMPLATE_SOURCE_MISSING', template: template.name, source: file.source });
-      if (!file.target) errors.push({ code: 'TEMPLATE_TARGET_REQUIRED', template: template.name });
+  const ids = new Set((pack.capabilities || []).map((item) => item.id));
+  for (const capability of pack.capabilities || []) {
+    if (!capability.id) errors.push({ code: 'CAPABILITY_ID_REQUIRED', directory: capability.directory });
+    for (const dep of capability.requires || []) if (!ids.has(dep)) errors.push({ code: 'UNKNOWN_REQUIRED_CAPABILITY', capability: capability.id, dependency: dep });
+    for (const suggestion of capability.suggests || []) {
+      const id = typeof suggestion === 'string' ? suggestion : suggestion.capability;
+      if (id && !ids.has(id)) warnings.push({ code: 'UNKNOWN_SUGGESTED_CAPABILITY', capability: capability.id, suggestion: id });
     }
-  }
-  for (const intent of pack.intents || []) {
-    if (!intent.name) errors.push({ code: 'INTENT_NAME_REQUIRED' });
-    if (intent.template && !templateNames.has(intent.template)) errors.push({ code: 'UNKNOWN_TEMPLATE', intent: intent.name, template: intent.template });
-  }
-  for (const recipe of pack.recipes || []) {
-    if (!recipe.name) errors.push({ code: 'RECIPE_NAME_REQUIRED' });
-    for (const task of recipe.tasks || []) {
-      if (task.intent && !intentNames.has(task.intent)) errors.push({ code: 'UNKNOWN_INTENT', recipe: recipe.name, task: task.id, intent: task.intent });
-      if (task.recipe && !recipeNames.has(task.recipe)) errors.push({ code: 'UNKNOWN_RECIPE', recipe: recipe.name, task: task.id, dependency: task.recipe });
+    for (const group of Object.values(capability.alternatives || {})) for (const id of group || []) if (!ids.has(id)) warnings.push({ code: 'UNKNOWN_ALTERNATIVE_CAPABILITY', capability: capability.id, alternative: id });
+    for (const file of capability.files || []) {
+      const source = path.join(capability.directory, file.source || '');
+      if (!file.source || !exists(source)) errors.push({ code: 'CAPABILITY_SOURCE_MISSING', capability: capability.id, source: file.source });
+      if (!file.target) errors.push({ code: 'CAPABILITY_TARGET_REQUIRED', capability: capability.id });
     }
+    const optionalCategories = ['controller.', 'consumer.', 'repository.mongo', 'document.', 'runtime.', 'messaging.', 'security.', 'logging.'];
+    if (capability.id === 'context.ddd') for (const dep of capability.requires || []) if (optionalCategories.some((prefix) => dep.startsWith(prefix))) errors.push({ code: 'OVERGENERATION_FORBIDDEN', capability: capability.id, dependency: dep });
   }
-  if (!(pack.templates || []).length) warnings.push({ code: 'NO_TEMPLATES', message: 'Pack has no templates.' });
-  return { status: errors.length ? 'FAILED' : 'OK', errors, warnings, counts: { templates: pack.templates?.length || 0, intents: pack.intents?.length || 0, recipes: pack.recipes?.length || 0, policies: pack.policies?.length || 0 } };
+  if (!(pack.capabilities || []).length) warnings.push({ code: 'NO_CAPABILITIES', message: 'Pack has no capabilities.' });
+  return { status: errors.length ? 'FAILED' : 'OK', errors, warnings, counts: { capabilities: pack.capabilities?.length || 0, policies: pack.policies?.length || 0 } };
 }
 
 
@@ -1448,74 +1409,68 @@ function renderPackText(text, variables) {
   });
 }
 
-function genericRecipeOperations(pack, recipe, root, flags) {
-  const intents = new Map((pack.intents || []).map((item) => [item.name, item]));
-  const templates = new Map((pack.templates || []).map((item) => [item.name, item]));
-  const variables = templateVariables(flags);
-  const operations = [];
-  for (const task of recipe.tasks || []) {
-    if (!task.intent) throw new Error(`Generic recipe task ${task.id || '<unnamed>'} must reference an intent.`);
-    const intent = intents.get(task.intent);
-    if (!intent) throw new Error(`Unknown intent ${task.intent} in recipe ${recipe.name}.`);
-    const template = templates.get(intent.template);
-    if (!template) throw new Error(`Unknown template ${intent.template} in intent ${intent.name}.`);
-    const templateDir = path.join(pack.directory, 'templates', template.directory);
-    for (const mapping of template.files || []) {
-      const source = path.join(templateDir, mapping.source);
-      const target = path.resolve(root, renderPackText(mapping.target, variables));
-      const content = renderPackText(fs.readFileSync(source, 'utf8'), variables);
-      operations.push({ task: task.id, intent: intent.name, template: template.name, source, target, content });
-    }
-  }
-  return operations;
+function capabilityMap(pack) {
+  return new Map((pack.capabilities || []).map((item) => [item.id, item]));
 }
 
-async function runGenericPackRecipe(root, pack, recipe, action, flags) {
-  const operations = genericRecipeOperations(pack, recipe, root, flags);
-  const plan = {
-    status: 'OK', mode: 'plan', pack: pack.name, recipe: recipe.name, root,
-    wouldCreate: operations.filter((op) => !exists(op.target)).map((op) => rel(root, op.target)),
-    alreadyExists: operations.filter((op) => exists(op.target)).map((op) => rel(root, op.target)),
-    conflicts: [], warnings: [],
-    tasks: operations.map((op) => ({ id: op.task, intent: op.intent, template: op.template, target: rel(root, op.target) }))
+function resolveCapabilityExecution(pack, capabilityId, root, flags) {
+  const byId = capabilityMap(pack);
+  const variables = templateVariables(flags);
+  const operations = [];
+  const execution = [];
+  const visiting = new Set();
+  const visited = new Set();
+  const walk = (id, inheritedRoot = root) => {
+    if (visited.has(id)) return;
+    if (visiting.has(id)) throw new Error(`Capability dependency cycle detected at ${id}.`);
+    const capability = byId.get(id);
+    if (!capability) throw new Error(`Unknown capability ${id}.`);
+    visiting.add(id);
+    const capabilityRoot = capability.targetRoot ? path.resolve(root, renderPackText(capability.targetRoot, variables)) : inheritedRoot;
+    for (const dependency of capability.requires || []) walk(dependency, capabilityRoot);
+    for (const mapping of capability.files || []) {
+      const source = path.resolve(capability.directory, mapping.source);
+      const target = path.resolve(capabilityRoot, renderPackText(mapping.target, variables));
+      const content = renderPackText(fs.readFileSync(source, 'utf8'), variables);
+      operations.push({ capability: id, source, target, content });
+    }
+    execution.push({ id, root: rel(root, capabilityRoot), fileCount: (capability.files || []).length });
+    visiting.delete(id); visited.add(id);
   };
+  walk(capabilityId, root);
+  return { operations, execution, capability: byId.get(capabilityId), byId };
+}
+
+async function runPackCapability(root, pack, capabilityId, action, flags) {
+  const resolved = resolveCapabilityExecution(pack, capabilityId, root, flags);
+  const required = resolved.capability.required || [];
+  const missing = required.filter((name) => flags[name] === undefined && flags[name.toLowerCase()] === undefined);
+  if (missing.length) return { status: 'BLOCKED', capability: capabilityId, reason: 'MISSING_ARGUMENTS', missing, example: resolved.capability.example };
+  const plan = { status: 'OK', mode: 'plan', pack: pack.name, capability: capabilityId, root,
+    wouldCreate: resolved.operations.filter((op) => !exists(op.target)).map((op) => rel(root, op.target)),
+    alreadyExists: resolved.operations.filter((op) => exists(op.target)).map((op) => rel(root, op.target)),
+    conflicts: [], execution: resolved.execution,
+    suggestedCapabilities: JSON.parse(renderPackText(JSON.stringify(resolved.capability.suggests || []), templateVariables(flags))), alternatives: JSON.parse(renderPackText(JSON.stringify(resolved.capability.alternatives || {}), templateVariables(flags))) };
   if (action === 'plan') return plan;
   const effects = newEffects();
-  for (const op of operations) {
+  for (const op of resolved.operations) {
     if (exists(op.target)) {
       const current = fs.readFileSync(op.target, 'utf8');
       if (current === op.content) effects.existing.push(op.target);
-      else effects.blocked.push({ path: op.target, reason: 'Target exists with different content. Generic packs never overwrite by default.' });
+      else effects.blocked.push({ path: op.target, reason: 'Target exists with different content. Capabilities never overwrite by default.' });
       continue;
     }
-    ensureDir(path.dirname(op.target));
-    fs.writeFileSync(op.target, op.content);
-    effects.created.push(op.target);
+    ensureDir(path.dirname(op.target)); fs.writeFileSync(op.target, op.content); effects.created.push(op.target);
   }
   const logicSlots = [];
-  for (const op of operations) {
-    const pattern = /AHRE_SLOT_START:([^\n\r]+)([\s\S]*?)AHRE_SLOT_END:\1/g;
-    let match;
-    while ((match = pattern.exec(op.content)) !== null) {
-      const body = String(match[2] || '').split(/\r?\n/).map((line) => line.replace(/^\s*\/\/\s?/, '').trim()).filter(Boolean);
-      logicSlots.push({
-        id: match[1].trim(),
-        path: rel(root, op.target),
-        markerStart: `AHRE_SLOT_START:${match[1].trim()}`,
-        markerEnd: `AHRE_SLOT_END:${match[1].trim()}`,
-        purpose: body[0] || 'Business-specific extension point.'
-      });
-    }
+  for (const op of resolved.operations) {
+    const pattern = /AHRE_SLOT_START:([^\n\r]+)([\s\S]*?)AHRE_SLOT_END:\1/g; let match;
+    while ((match = pattern.exec(op.content)) !== null) logicSlots.push({ id: match[1].trim(), path: rel(root, op.target), markerStart: `AHRE_SLOT_START:${match[1].trim()}`, markerEnd: `AHRE_SLOT_END:${match[1].trim()}`, purpose: String(match[2] || '').split(/\r?\n/).map((line) => line.replace(/^\s*\/\/\s?/, '').trim()).filter(Boolean)[0] || 'Business-specific extension point.' });
   }
-  return withPostMutationQuality(root, {
-    status: effects.blocked.length ? 'BLOCKED' : 'OK', mode: 'apply', pack: pack.name, recipe: recipe.name,
-    effects: normalizeEffectPaths(root, effects),
-    tasks: plan.tasks,
-    logicSlots,
-    nextForLLM: logicSlots.length
-      ? ['Do not inspect generated files first.', 'Use the returned logicSlots as exact insertion coordinates for business-specific code.', 'Use the returned task targets and quality report for the rest of the generated structure.']
-      : ['Use the returned task targets and quality report before reading generated files.']
-  }, flags, effects);
+  return withPostMutationQuality(root, { status: effects.blocked.length ? 'BLOCKED' : 'OK', mode: 'apply', pack: pack.name, capability: capabilityId,
+    effects: normalizeEffectPaths(root, effects), execution: resolved.execution, logicSlots,
+    suggestedCapabilities: JSON.parse(renderPackText(JSON.stringify(resolved.capability.suggests || []), templateVariables(flags))), alternatives: JSON.parse(renderPackText(JSON.stringify(resolved.capability.alternatives || {}), templateVariables(flags))),
+    nextForLLM: ['Do not inspect generated files first.', 'Use logicSlots for business-specific code.', 'Optional capabilities were not executed; choose only suggestions required by the current task.'] }, flags, effects);
 }
 
 const ARCHITECTURE_PACK = {
@@ -2053,22 +2008,8 @@ const PUBLIC_CAPABILITIES = [
 
 function capabilityCatalog(root) {
   const catalog = [...PUBLIC_CAPABILITIES];
-  for (const pack of discoverPacks(root)) {
-    for (const recipe of pack.recipes || []) {
-      if (catalog.some((item) => item.recipe === recipe.name || item.id === recipe.name)) continue;
-      catalog.push({
-        id: recipe.id || recipe.name.replace(/\.ensure$/, ''),
-        recipe: recipe.name,
-        pack: pack.name,
-        aliases: recipe.aliases || [],
-        tags: recipe.tags || [],
-        required: recipe.required || [],
-        example: recipe.example || `ahre code ${recipe.id || recipe.name.replace(/\.ensure$/, '')} --json`,
-        description: recipe.description || `Execute ${recipe.name}.`
-      });
-    }
-  }
-  return catalog;
+  for (const pack of discoverPacks(root)) for (const capability of pack.capabilities || []) catalog.push({ id: capability.id, pack: pack.name, aliases: capability.aliases || [], tags: capability.tags || [], required: capability.required || [], example: capability.example || `ahre code ${capability.id} --json`, description: capability.description || `Execute ${capability.id}.`, suggests: capability.suggests || [], alternatives: capability.alternatives || {} });
+  return catalog.filter((item, index, all) => all.findIndex((other) => other.id === item.id) === index);
 }
 
 function scoreCapability(item, query) {
@@ -2126,7 +2067,7 @@ export class AhreCli {
     const root = serviceRoot(this.cwd, {});
     if (topic) {
       const capability = capabilityCatalog(root).find((item) => item.id === topic);
-      if (capability) return this.output({ status: 'OK', capability: { id: capability.id, description: capability.description, required: capability.required || [], aliases: capability.aliases || [], tags: capability.tags || [], example: capability.example }, workflow: ['Use the exact id with `ahre code`.', 'Read the returned slots, tasks, graph, quality and next actions.', 'Do not inspect generated files first.'] }, asJson);
+      if (capability) return this.output({ status: 'OK', capability: { id: capability.id, description: capability.description, required: capability.required || [], aliases: capability.aliases || [], tags: capability.tags || [], example: capability.example, suggests: capability.suggests || [], alternatives: capability.alternatives || {} }, workflow: ['Use the exact id with `ahre code`.', 'Read the returned slots, tasks, graph, quality and next actions.', 'Do not inspect generated files first.'] }, asJson);
       if (topic === 'authoring') return this.output({ status: 'OK', topic, summary: 'Capabilities are backed by composable filesystem definitions. Use `ahre doctor --json` to validate all definitions. Advanced compatibility commands remain available but are not required for runtime use.' }, asJson);
       return this.output({ status: 'NOT_FOUND', topic, instruction: `Run \`ahre find "${topic}" --json\` to discover the matching capability.` }, asJson);
     }
@@ -2167,13 +2108,12 @@ export class AhreCli {
     const capability = capabilityCatalog(root).find((item) => item.id === capabilityId);
     if (!capability) return this.output({ status: 'NOT_FOUND', capability: capabilityId, instruction: `Run \`ahre find "${capabilityId}" --json\`.` }, flags.json);
     if (capability.internal === 'slot.insert') return await this.handleCodeInsertSlot(flags);
-    if (capability.pack && capability.recipe) {
+    if (capability.pack) {
       const pack = resolvePack(root, capability.pack);
-      const recipe = pack?.recipes?.find((item) => item.name === capability.recipe);
-      if (!pack || !recipe) return this.output({ status: 'NOT_FOUND', capability: capabilityId }, flags.json);
-      return this.output(await runGenericPackRecipe(root, pack, recipe, 'apply', flags), flags.json);
+      if (!pack) return this.output({ status: 'NOT_FOUND', capability: capabilityId }, flags.json);
+      return this.output(await runPackCapability(root, pack, capabilityId, 'apply', flags), flags.json);
     }
-    return await this.handleRecipe('apply', capability.recipe, flags);
+    return this.output({ status: 'NOT_FOUND', capability: capabilityId }, flags.json);
   }
 
   async handleInspect(subject, maybe, unused, flags) {
@@ -2708,7 +2648,7 @@ export class AhreCli {
     const pack = resolvePack(root, packName);
     if (action === 'show' || action === 'describe' || action === 'tree') {
       if (!pack) return this.output({ status: 'NOT_FOUND', pack: packName }, flags.json);
-      return this.output({ status: 'OK', pack: pack.name, version: pack.version, path: rel(root, pack.directory), layout: { templates: pack.templates, intents: pack.intents, recipes: pack.recipes, policies: pack.policies } }, flags.json);
+      return this.output({ status: 'OK', pack: pack.name, version: pack.version, path: rel(root, pack.directory), layout: { capabilities: pack.capabilities, policies: pack.policies } }, flags.json);
     }
     if (action === 'validate' || action === 'doctor') {
       const report = validatePack(pack);

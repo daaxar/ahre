@@ -1,0 +1,10 @@
+{
+  "id": "logging.winston",
+  "description": "Create Winston logger adapter.",
+  "files": [
+    {
+      "source": "files/WinstonLogger.ts.tpl",
+      "target": "src/Shared/Infrastructure/Logs/WinstonLogger.ts"
+    }
+  ]
+}

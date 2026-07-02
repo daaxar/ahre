@@ -1,0 +1,21 @@
+{
+  "id": "service.workspace",
+  "description": "Create the minimal TypeScript service workspace.",
+  "required": [
+    "service"
+  ],
+  "files": [
+    {
+      "source": "files/package.json.tpl",
+      "target": "package.json"
+    },
+    {
+      "source": "files/tsconfig.json.tpl",
+      "target": "tsconfig.json"
+    },
+    {
+      "source": "files/jest.config.cjs.tpl",
+      "target": "jest.config.cjs"
+    }
+  ]
+}

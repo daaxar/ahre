@@ -1,0 +1,10 @@
+{
+  "id": "messaging.sqs",
+  "description": "Create SQS queue adapter.",
+  "files": [
+    {
+      "source": "files/SqsMessageQueue.ts.tpl",
+      "target": "src/Shared/Infrastructure/MessageQueue/SqsMessageQueue.ts"
+    }
+  ]
+}

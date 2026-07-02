@@ -1,0 +1,33 @@
+{
+  "id": "runtime.docker",
+  "description": "Create optional Docker, environment, PM2 and test-world runtime files.",
+  "required": [
+    "service"
+  ],
+  "files": [
+    {
+      "source": "files/Dockerfile.tpl",
+      "target": "Dockerfile"
+    },
+    {
+      "source": "files/docker-compose.yml.tpl",
+      "target": "docker-compose.yml"
+    },
+    {
+      "source": "files/.env.dev.tpl",
+      "target": ".env.dev"
+    },
+    {
+      "source": "files/.env.test.tpl",
+      "target": ".env.test"
+    },
+    {
+      "source": "files/ecosystem.config.js.tpl",
+      "target": "ecosystem.config.js"
+    },
+    {
+      "source": "files/tests/steps/world.ts.tpl",
+      "target": "tests/steps/world.ts"
+    }
+  ]
+}

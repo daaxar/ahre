@@ -1,0 +1,10 @@
+{
+  "id": "messaging.bus",
+  "description": "Create shared message bus port.",
+  "files": [
+    {
+      "source": "files/MessageBus.ts.tpl",
+      "target": "src/Shared/Infrastructure/MessageBus/MessageBus.ts"
+    }
+  ]
+}

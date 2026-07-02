@@ -1,0 +1,14 @@
+{
+  "id": "usecase.create",
+  "description": "Create application create use case.",
+  "required": [
+    "context",
+    "entity"
+  ],
+  "files": [
+    {
+      "source": "files/src/Context/Application/UseCase/CreateEntity/CreateEntity.ts.tpl",
+      "target": "src/{{context}}/Application/UseCase/Create{{entity}}/Create{{entity}}.ts"
+    }
+  ]
+}

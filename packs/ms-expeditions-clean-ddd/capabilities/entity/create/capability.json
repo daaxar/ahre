@@ -1,0 +1,55 @@
+{
+  "id": "entity.create",
+  "description": "Create the minimal domain and application artifacts for an entity create capability. It does not impose HTTP, consumers or a persistence adapter.",
+  "aliases": [
+    "create entity",
+    "aggregate create",
+    "entity capability"
+  ],
+  "tags": [
+    "entity",
+    "aggregate",
+    "ddd",
+    "create"
+  ],
+  "required": [
+    "context",
+    "entity"
+  ],
+  "requires": [
+    "context.ddd",
+    "entity.aggregate",
+    "repository.interface",
+    "usecase.create",
+    "event.created",
+    "tests.entity-create"
+  ],
+  "suggests": [
+    {
+      "capability": "controller.http",
+      "when": "Expose Create{{entity}} through HTTP."
+    },
+    {
+      "capability": "repository.mongo",
+      "when": "Persist {{entity}} in MongoDB."
+    },
+    {
+      "capability": "consumer.event",
+      "when": "Trigger the capability from an asynchronous event."
+    },
+    {
+      "capability": "tests.api-create",
+      "when": "An HTTP endpoint exists and needs an API feature."
+    }
+  ],
+  "alternatives": {
+    "transport": [
+      "controller.http",
+      "consumer.event"
+    ],
+    "persistence": [
+      "repository.mongo"
+    ]
+  },
+  "example": "ahre code entity.create --entity Order --context Orders --json"
+}

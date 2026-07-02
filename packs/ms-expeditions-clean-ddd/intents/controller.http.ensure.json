@@ -1,5 +1,0 @@
-{
-  "name": "controller.http.ensure",
-  "description": "Ensure HTTP controller.",
-  "template": "entity.controller-http"
-}

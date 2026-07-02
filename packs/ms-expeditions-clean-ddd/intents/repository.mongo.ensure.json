@@ -1,5 +1,0 @@
-{
-  "name": "repository.mongo.ensure",
-  "description": "Ensure Mongo repository adapter.",
-  "template": "entity.repository-mongo"
-}

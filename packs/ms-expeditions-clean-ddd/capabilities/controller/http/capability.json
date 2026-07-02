@@ -1,0 +1,14 @@
+{
+  "id": "controller.http",
+  "description": "Create HTTP controller adapter.",
+  "required": [
+    "context",
+    "entity"
+  ],
+  "files": [
+    {
+      "source": "files/src/Context/Infrastructure/UI/Controller/EntityController.ts.tpl",
+      "target": "src/{{context}}/Infrastructure/UI/Controller/{{entity}}Controller.ts"
+    }
+  ]
+}

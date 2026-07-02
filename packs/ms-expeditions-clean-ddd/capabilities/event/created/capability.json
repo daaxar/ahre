@@ -1,0 +1,14 @@
+{
+  "id": "event.created",
+  "description": "Create domain created event.",
+  "required": [
+    "context",
+    "entity"
+  ],
+  "files": [
+    {
+      "source": "files/src/Context/Domain/Event/EntityWasCreated.ts.tpl",
+      "target": "src/{{context}}/Domain/Event/{{entity}}WasCreated.ts"
+    }
+  ]
+}

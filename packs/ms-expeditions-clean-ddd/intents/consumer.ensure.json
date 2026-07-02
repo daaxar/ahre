@@ -1,5 +1,0 @@
-{
-  "name": "consumer.ensure",
-  "description": "Ensure event consumer.",
-  "template": "consumer.event"
-}

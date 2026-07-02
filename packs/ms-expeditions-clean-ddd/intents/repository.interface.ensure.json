@@ -1,5 +1,0 @@
-{
-  "name": "repository.interface.ensure",
-  "description": "Ensure repository interface.",
-  "template": "entity.repository"
-}

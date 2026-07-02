@@ -1,0 +1,14 @@
+{
+  "id": "tests.api-create",
+  "description": "Create the optional API feature for an HTTP create endpoint.",
+  "required": [
+    "context",
+    "entity"
+  ],
+  "files": [
+    {
+      "source": "files/create.feature.tpl",
+      "target": "tests/api/{{context}}/create-{{entity}}.feature"
+    }
+  ]
+}

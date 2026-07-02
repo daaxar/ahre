@@ -1,0 +1,26 @@
+{
+  "id": "shared.domain",
+  "description": "Create shared domain primitives required by generated domain artifacts.",
+  "files": [
+    {
+      "source": "files/src/Shared/Domain/AggregateRoot.ts.tpl",
+      "target": "src/Shared/Domain/AggregateRoot.ts"
+    },
+    {
+      "source": "files/src/Shared/Domain/ValueObject/Uuid.ts.tpl",
+      "target": "src/Shared/Domain/ValueObject/Uuid.ts"
+    },
+    {
+      "source": "files/src/Shared/Domain/ValueObject/String.ts.tpl",
+      "target": "src/Shared/Domain/ValueObject/String.ts"
+    },
+    {
+      "source": "files/src/Shared/Domain/ValueObject/Number.ts.tpl",
+      "target": "src/Shared/Domain/ValueObject/Number.ts"
+    },
+    {
+      "source": "files/src/Shared/Domain/ValueObject/DateTime.ts.tpl",
+      "target": "src/Shared/Domain/ValueObject/DateTime.ts"
+    }
+  ]
+}

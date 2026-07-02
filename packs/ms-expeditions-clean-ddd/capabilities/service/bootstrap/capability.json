@@ -1,0 +1,18 @@
+{
+  "id": "service.bootstrap",
+  "description": "Create the executable service entrypoint, kernel and DI container baseline.",
+  "files": [
+    {
+      "source": "files/src/index.ts.tpl",
+      "target": "src/index.ts"
+    },
+    {
+      "source": "files/src/Kernel.ts.tpl",
+      "target": "src/Kernel.ts"
+    },
+    {
+      "source": "files/config/container/services.yaml.tpl",
+      "target": "config/container/services.yaml"
+    }
+  ]
+}

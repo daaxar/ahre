@@ -1,0 +1,10 @@
+{
+  "id": "security.rbac",
+  "description": "Create RBAC policy baseline.",
+  "files": [
+    {
+      "source": "files/RbacPolicy.ts.tpl",
+      "target": "src/Shared/Infrastructure/Security/RbacPolicy.ts"
+    }
+  ]
+}

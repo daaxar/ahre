@@ -1,5 +1,0 @@
-{
-  "name": "usecase.command.ensure",
-  "description": "Ensure create use case.",
-  "template": "entity.usecase-create"
-}

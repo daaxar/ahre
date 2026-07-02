@@ -1,0 +1,8 @@
+{
+  "id": "messaging.amqp-sqs",
+  "description": "Create message bus and SQS adapter.",
+  "requires": [
+    "messaging.bus",
+    "messaging.sqs"
+  ]
+}

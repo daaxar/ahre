@@ -1,5 +1,0 @@
-{
-  "name": "shared.domain.ensure",
-  "description": "Ensure shared aggregate root and value-object primitives.",
-  "template": "shared.domain"
-}

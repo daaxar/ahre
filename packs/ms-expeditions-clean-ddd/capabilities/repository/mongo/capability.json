@@ -1,0 +1,14 @@
+{
+  "id": "repository.mongo",
+  "description": "Create Mongo repository adapter.",
+  "required": [
+    "context",
+    "entity"
+  ],
+  "files": [
+    {
+      "source": "files/src/Context/Infrastructure/Persistence/MongoEntityRepository.ts.tpl",
+      "target": "src/{{context}}/Infrastructure/Persistence/Mongo{{entity}}Repository.ts"
+    }
+  ]
+}

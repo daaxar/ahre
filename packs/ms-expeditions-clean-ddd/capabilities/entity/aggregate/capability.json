@@ -1,0 +1,18 @@
+{
+  "id": "entity.aggregate",
+  "description": "Create aggregate and identifier.",
+  "required": [
+    "context",
+    "entity"
+  ],
+  "files": [
+    {
+      "source": "files/src/Context/Domain/Model/Entity.ts.tpl",
+      "target": "src/{{context}}/Domain/Model/{{entity}}.ts"
+    },
+    {
+      "source": "files/src/Context/Domain/ValueObject/EntityId.ts.tpl",
+      "target": "src/{{context}}/Domain/ValueObject/{{entity}}Id.ts"
+    }
+  ]
+}

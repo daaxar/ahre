@@ -1,0 +1,10 @@
+{
+  "id": "security.jwt",
+  "description": "Create JWT verifier baseline.",
+  "files": [
+    {
+      "source": "files/JwtVerifier.ts.tpl",
+      "target": "src/Shared/Infrastructure/Security/JwtVerifier.ts"
+    }
+  ]
+}

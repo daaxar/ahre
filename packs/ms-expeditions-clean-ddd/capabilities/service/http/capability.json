@@ -1,0 +1,48 @@
+{
+  "id": "service.http",
+  "description": "Create a minimal TypeScript HTTP service baseline without optional persistence, messaging, consumers or document adapters.",
+  "aliases": [
+    "http service",
+    "web service",
+    "api service",
+    "web server"
+  ],
+  "tags": [
+    "http",
+    "service",
+    "typescript",
+    "api"
+  ],
+  "required": [
+    "service"
+  ],
+  "targetRoot": "servs/{{service}}",
+  "requires": [
+    "service.workspace",
+    "service.bootstrap",
+    "shared.domain"
+  ],
+  "suggests": [
+    {
+      "capability": "context.ddd",
+      "when": "Add the first bounded context."
+    },
+    {
+      "capability": "runtime.docker",
+      "when": "Run the service in Docker/PM2."
+    },
+    {
+      "capability": "security.jwt-rbac",
+      "when": "The service needs JWT/JWKS authentication and RBAC."
+    },
+    {
+      "capability": "messaging.amqp-sqs",
+      "when": "The service publishes or consumes asynchronous messages."
+    },
+    {
+      "capability": "logging.winston",
+      "when": "The service needs the architecture logging adapter."
+    }
+  ],
+  "example": "ahre code service.http --service orders --json"
+}
