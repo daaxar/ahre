@@ -1,0 +1,11 @@
+{
+  "name": "application.usecase-command",
+  "description": "# Template: application.usecase-command",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/application.usecase-command.txt"
+    }
+  ]
+}

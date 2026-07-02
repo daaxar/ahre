@@ -1,0 +1,11 @@
+{
+  "name": "shared.aggregate-root",
+  "description": "# Template: shared.aggregate-root",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/shared.aggregate-root.txt"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "application.finder",
+  "description": "# Template: application.finder",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/application.finder.txt"
+    }
+  ]
+}

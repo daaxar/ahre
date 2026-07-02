@@ -1,0 +1,11 @@
+{
+  "name": "infrastructure.xlsx-exporter",
+  "description": "# Template: infrastructure.xlsx-exporter",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/infrastructure.xlsx-exporter.txt"
+    }
+  ]
+}

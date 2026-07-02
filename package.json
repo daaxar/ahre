@@ -1,14 +1,14 @@
 {
   "name": "ahre-cli",
-  "version": "0.6.1",
-  "description": "AhRE - ArcHitecture Recipe Engine CLI with mandatory .agents skill bootstrap, deterministic recipes, logic slots, semantic inventory, graph, search, and build planning",
+  "version": "0.8.0",
+  "description": "AhRE deterministic capability engine with a minimal public CLI and composable filesystem definitions",
   "type": "module",
   "bin": {
     "ahre": "./bin/ahre.mjs"
   },
   "scripts": {
     "start": "node ./bin/ahre.mjs",
-    "smoke": "node ./bin/ahre.mjs intents list --json && node ./bin/ahre.mjs skill list --all --json && node ./bin/ahre.mjs recipe plan entity.capability.ensure --entity User --context Users --json && node ./bin/ahre.mjs graph build --json",
+    "smoke": "node ./bin/ahre.mjs find \"http service\" --json && node ./bin/ahre.mjs help && node ./bin/ahre.mjs doctor --json",
     "check": "node --check ./src/ahre-cli.mjs && node --check ./bin/ahre.mjs"
   },
   "keywords": [

@@ -1,0 +1,11 @@
+{
+  "name": "domain.value-object",
+  "description": "# Template: domain.value-object",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/domain.value-object.txt"
+    }
+  ]
+}

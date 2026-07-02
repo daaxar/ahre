@@ -1,6 +1,0 @@
-{
-  "name": "ms-expeditions-clean-ddd",
-  "version": "0.4.0",
-  "source": "ARCHITECTURE.md",
-  "description": "Templates, recipes and intents for the ms-expeditions Clean/Hexagonal/DDD architecture pack."
-}

@@ -1,38 +1,31 @@
 ---
 name: "AhRE Usage"
-description: "Mandatory entrypoint for agents using AhRE before creating or modifying architecture/code artifacts. Routes to generation, context, and quality skills."
+description: "Mandatory minimal workflow for using AhRE before manually creating or modifying code."
 ---
 
 # AhRE Usage
 
-Use this skill before creating, modifying, wiring, searching, verifying, or planning code/architecture artifacts.
+AhRE is deterministic. The LLM decides what must be built and supplies business logic. AhRE composes definitions, creates or updates files, exposes insertion slots, refreshes inventory/graph, runs quality checks, and reports exactly what happened.
 
-AhRE is deterministic. It creates files, updates indexes, exposes slots, runs checks, and reports diagnostics. The LLM decides architecture intent and business logic.
+## Mandatory workflow
 
-## Mandatory rule
-
-Before writing code manually, try AhRE first.
-
-Do not manually scaffold bounded contexts, entities, value objects, repositories, use cases, controllers, consumers, events, tests, DI bindings, runtime files, or architecture folders when AhRE has an applicable intent or recipe.
-
-## Load only the smallest extra skill
-
-Do not load every AhRE skill by default.
-
-- For generation or modification, read `.agents/ahre-generation/SKILL.md`.
-- For locating artifacts, slots, tasks, inventory, index, or graph without reading files, read `.agents/ahre-context/SKILL.md`.
-- For format, lint, typecheck, tests, coverage, diagnostics, or skipped checks, read `.agents/ahre-quality/SKILL.md`.
-
-## Minimal workflow
+Before manually writing architecture or scaffold code:
 
 ```bash
-ahre intents search "<task>" --json
-ahre recipe plan <recipe> --json
-ahre recipe apply <recipe> --json
+ahre find "<task>" --json
+ahre help <capability> --json
+ahre code <capability> [arguments] --json
 ```
 
-After any mutating AhRE command, inspect the returned `quality` report. AhRE runs default post-action static checks automatically.
+Never invent capability ids or arguments. Use `find` and `help` first when they are unknown.
 
-Do not inspect generated files first. Use returned `logicSlots`, `currentKnowledge`, `tasks`, `graph`, and `quality` before reading files.
+After `ahre code`, use the returned artifacts, slots, tasks, diagnostics, quality report, and next actions. Do not inspect generated files first.
 
-Manual implementation is allowed only when AhRE is unavailable, returns `BLOCKED`, has no applicable intent/recipe, or business-specific logic intentionally remains for the LLM.
+For later context:
+
+```bash
+ahre inspect last --json
+ahre inspect <subject> --json
+```
+
+Use manual code only for business-specific logic or when AhRE explicitly returns `BLOCKED`, `NOT_FOUND`, or insufficient context.

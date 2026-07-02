@@ -1,47 +1,22 @@
 ---
-name: "AhRE Generation"
-description: "Use AhRE intents, recipes, and deterministic code modification commands for architecture/code generation and slot edits."
+name: "AhRE Capability Authoring"
+description: "Create or extend filesystem capabilities used internally by the minimal AhRE code command."
 ---
 
-# AhRE Generation
+# AhRE Capability Authoring
 
-Use this skill when creating or modifying architecture/code artifacts.
+Use only when creating or extending AhRE definitions.
 
-## Do not invent recipe names
-
-Discover or confirm the command first:
+A public capability is invoked with:
 
 ```bash
-ahre intents search "<task>" --json
-ahre intents describe <intent> --json
-ahre recipe list --json
-ahre recipe describe <recipe> --json
+ahre code <capability> [arguments] --json
 ```
 
-## Main generation commands
+Definitions may compose other definitions, render file trees, expose slots, create tasks, and declare checks. Keep the filesystem navigable and metadata declarative. Runtime users should not need to know whether a definition is internally a recipe, intent, template, or pack.
+
+Validate all installed definitions with:
 
 ```bash
-ahre recipe plan architecture.service.ensure --service <service> --json
-ahre recipe apply architecture.service.ensure --service <service> --json
-
-ahre recipe plan bounded-context.ensure --context <Context> --json
-ahre recipe apply bounded-context.ensure --context <Context> --json
-
-ahre recipe plan entity.capability.ensure --entity <Entity> --context <Context> --json
-ahre recipe apply entity.capability.ensure --entity <Entity> --context <Context> --json
+ahre doctor --json
 ```
-
-## Micro modification commands
-
-```bash
-ahre ensure value-object --context <Context> --name <Name> --json
-ahre ensure domain-event --context <Context> --event <EventName> --json
-ahre ensure method --entity <Entity> --context <Context> --method <methodName> --json
-ahre code insert-slot --slot <slotId> --content-file <file> --json
-```
-
-AhRE does not decide business logic. For business-specific code, use the slot ids returned by AhRE or query them with the context skill.
-
-## After mutation
-
-Every mutating command returns a `quality` report. Trust it. Do not manually run external format/lint/typecheck/tests unless AhRE reports a check as `SKIPPED` or the user asks for deeper verification.

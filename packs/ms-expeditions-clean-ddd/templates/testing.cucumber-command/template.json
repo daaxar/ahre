@@ -1,0 +1,11 @@
+{
+  "name": "testing.cucumber-command",
+  "description": "# Template: testing.cucumber-command",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/testing.cucumber-command.txt"
+    }
+  ]
+}

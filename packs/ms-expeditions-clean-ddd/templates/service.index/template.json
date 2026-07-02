@@ -1,0 +1,11 @@
+{
+  "name": "service.index",
+  "description": "# Template: service.index",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/service.index.txt"
+    }
+  ]
+}

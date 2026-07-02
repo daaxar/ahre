@@ -1,159 +1,66 @@
-# AhRE CLI v0.6.1
+# AhRE CLI v0.8.0
 
-AhRE — ArcHitecture Recipe Engine — is a deterministic CLI for LLM-assisted software development.
+AhRE is a deterministic capability engine for coding agents. It is simple to invoke, composable internally, and explicit about everything it creates or changes.
 
-The LLM decides intent and business logic. AhRE creates/modifies files, registers inventory, exposes slots, refreshes graph/index, runs quality checks, and returns compact JSON feedback.
-
-## What is new in v0.6.1
-
-- Fixed `architecture.service.ensure` path reporting: `plan` and `apply` now report created/effected files relative to the repository root.
-- Added `pathBase: repository-root` and `serviceRoot: servs/<service>` to service recipe outputs.
-- `architecture.service.ensure` plan now uses the same deterministic baseline file list as apply.
-- Follow-up suggested recipe commands now include `--root <serviceRoot>`.
-- `--service <name>` now resolves to `servs/<name>` for service-scoped recipes.
-
-## What was new in v0.6.0
-
-- Split installable skills:
-  - `.agents/ahre-usage/SKILL.md`
-  - `.agents/ahre-generation/SKILL.md`
-  - `.agents/ahre-context/SKILL.md`
-  - `.agents/ahre-quality/SKILL.md`
-- `skill install usage` installs the full operational skill bundle and bootstraps `AGENTS.md`.
-- Automatic post-mutation quality pipeline.
-- New `quality` namespace.
-- Static checks include format, lint, typecheck, architecture verification, and slot integrity.
-- Full checks can include tests and coverage.
-- Mutating commands return `quality`, `graph`, `logicSlots`, `tasks`, `currentKnowledge`, and `nextForLLM`.
-
-## Install usage skills
+## Public CLI
 
 ```bash
-ahre skill install usage --json
+ahre find "http service" --json
+ahre help service.http --json
+ahre code service.http --service orders --json
+ahre inspect last --json
+ahre doctor --json
 ```
 
-Creates or updates:
+That is the intended public surface.
 
-```txt
-.agents/ahre-usage/SKILL.md
-.agents/ahre-generation/SKILL.md
-.agents/ahre-context/SKILL.md
-.agents/ahre-quality/SKILL.md
-.agents/manifest.json
-AGENTS.md
-```
+- `find` discovers deterministic capabilities by id, alias, tag, and description.
+- `help` explains the workflow and capability arguments.
+- `code` converges a capability: it composes dependencies, renders templates, creates or updates files, records slots/tasks, refreshes inventory and graph, and runs quality checks.
+- `inspect` returns consolidated repository knowledge without requiring a filesystem scan.
+- `doctor` validates definitions, architecture rules, slots, graph state, and installation health.
 
-## Generate architecture artifacts
+## Examples
 
 ```bash
-ahre recipe plan entity.capability.ensure \
-  --entity User \
-  --context Users \
-  --json
-
-ahre recipe apply entity.capability.ensure \
-  --entity User \
-  --context Users \
-  --json
+ahre code service.http --service orders --json
+ahre code context.ddd --context Orders --root servs/orders --json
+ahre code entity.create --entity Order --context Orders --root servs/orders --json
+ahre code consumer.event --event OrderWasCreated --context Orders --root servs/orders --json
+ahre code slot.insert --slot Orders.Order.create.domainRules --content-file ./rules.ts --root servs/orders --json
 ```
 
-After `apply`, AhRE returns deterministic `logicSlots` so the LLM knows where business logic belongs without reading generated files first.
+## Internal composition
 
-## Insert business-specific code into a slot
+The public capability can internally depend on many definitions:
 
-```bash
-ahre slot list --entity Users.User --json
-ahre slot get Users.User.create.domainRules --json
-
-ahre code insert-slot \
-  --slot Users.User.create.domainRules \
-  --content-file ./snippet.ts \
-  --json
+```text
+service.http
+├── workspace
+├── runtime.node
+├── http.express
+├── dependency-injection.yaml
+├── security.jwt-rbac
+├── testing.jest-cucumber
+└── quality.typescript
 ```
 
-AhRE does not decide the business logic. It only inserts supplied content into a deterministic marker range.
+Definitions live in human-readable filesystem trees. Existing `packs/`, recipes, intents, templates, policies, tasks, slots, inventory, graph and quality machinery remain implementation details and extension mechanisms. They are not required knowledge for normal AhRE use.
 
-## Automatic quality pipeline
+## Deterministic response
 
-Every mutating command runs `--quality fast` by default.
+A mutation reports:
 
-Fast mode:
+- created, updated, existing, blocked and skipped artifacts;
+- composed dependencies and executed tasks;
+- deterministic logic slots with file/class/method coordinates;
+- graph and inventory updates;
+- formatter, lint, typecheck, architecture, test and coverage results;
+- normalized diagnostics with file, line, column, rule and matching slot;
+- explicit next actions for the LLM.
 
-- formatter command when configured;
-- lint command when configured;
-- typecheck command when configured;
-- architecture verification;
-- slot integrity;
-- graph refresh.
+AhRE does not choose business logic. The LLM does.
 
-Full mode additionally runs tests and coverage when configured:
+## Compatibility
 
-```bash
-ahre recipe apply entity.capability.ensure \
-  --entity User \
-  --context Users \
-  --quality full \
-  --json
-```
-
-Disable only when explicitly needed:
-
-```bash
-ahre code insert-slot \
-  --slot Users.User.create.domainRules \
-  --content-file ./snippet.ts \
-  --quality off \
-  --json
-```
-
-## Manual quality commands
-
-```bash
-ahre quality run --json
-ahre quality run --mode full --json
-ahre quality static --json
-ahre quality format --json
-ahre quality lint --json
-ahre quality typecheck --json
-ahre quality test --json
-ahre quality coverage --json
-```
-
-`quality` reports are deterministic and compact. Diagnostics can include `tool`, `file`, `line`, `column`, `severity`, `rule`, `message`, and `slot`.
-
-## Project quality configuration
-
-AhRE detects scripts from `package.json` by default. Optional override:
-
-```json
-{
-  "quality": {
-    "defaultMode": "fast",
-    "autoRunAfterMutation": true,
-    "commands": {
-      "format": "npm run format",
-      "lint": "npm run lint",
-      "typecheck": "npm run typecheck",
-      "test": "npm run test:unit",
-      "coverage": "npm run coverage"
-    }
-  }
-}
-```
-
-Store this at `.ahre/config.json`.
-
-If `package.json`, scripts, or `node_modules` are missing, AhRE returns `SKIPPED` with a reason instead of pretending checks ran.
-
-## Context commands
-
-```bash
-ahre slot list --entity Users.User --json
-ahre task list --entity Users.User --json
-ahre inventory get entity Users.User --json
-ahre graph build --json
-ahre graph affected src/Users/Domain/Model/User.ts --json
-ahre search code User --json
-```
-
-Use these before reading generated files.
+Earlier command groups remain available for compatibility and authoring, but are intentionally omitted from the primary help and operational skill.

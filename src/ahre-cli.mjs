@@ -5,7 +5,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-const VERSION = '0.6.1';
+const VERSION = '0.8.0';
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const INTENTS = [
@@ -1284,9 +1284,225 @@ function installSkill({ root, skill, flags }) {
 }
 
 
+
+const PACK_LAYOUT = ['templates', 'intents', 'recipes', 'policies'];
+
+function packSearchRoots(root) {
+  return [
+    path.join(root, 'packs'),
+    path.join(root, '.ahre', 'packs'),
+    path.join(PACKAGE_ROOT, 'packs')
+  ];
+}
+
+function readPackDirectory(dir) {
+  const manifestFile = path.join(dir, 'pack.json');
+  if (!exists(manifestFile)) return null;
+  const manifest = readJson(manifestFile, null);
+  if (!manifest?.name) return null;
+  const collectJson = (folder) => {
+    const base = path.join(dir, folder);
+    if (!exists(base)) return [];
+    return fs.readdirSync(base, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+      .map((entry) => readJson(path.join(base, entry.name), null))
+      .filter(Boolean);
+  };
+  const templateBase = path.join(dir, 'templates');
+  const templates = exists(templateBase)
+    ? fs.readdirSync(templateBase, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && exists(path.join(templateBase, entry.name, 'template.json')))
+        .map((entry) => ({ ...readJson(path.join(templateBase, entry.name, 'template.json'), {}), directory: entry.name }))
+    : [];
+  return {
+    ...manifest,
+    directory: dir,
+    templates,
+    intents: collectJson('intents'),
+    recipes: collectJson('recipes'),
+    policies: collectJson('policies')
+  };
+}
+
+function discoverPacks(root) {
+  const found = new Map();
+  for (const base of packSearchRoots(root)) {
+    if (!exists(base)) continue;
+    for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const pack = readPackDirectory(path.join(base, entry.name));
+      if (pack && !found.has(pack.name)) found.set(pack.name, pack);
+    }
+  }
+  return [...found.values()];
+}
+
+function resolvePack(root, name) {
+  if (!name || name === ARCHITECTURE_PACK.name) {
+    const disk = discoverPacks(root).find((pack) => pack.name === ARCHITECTURE_PACK.name);
+    return disk || { ...ARCHITECTURE_PACK, directory: path.join(PACKAGE_ROOT, 'packs', ARCHITECTURE_PACK.name) };
+  }
+  return discoverPacks(root).find((pack) => pack.name === name) || null;
+}
+
+function copyDirectory(source, target) {
+  ensureDir(target);
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    const from = path.join(source, entry.name);
+    const to = path.join(target, entry.name);
+    if (entry.isDirectory()) copyDirectory(from, to);
+    else fs.copyFileSync(from, to);
+  }
+}
+
+function scaffoldPack(root, name, flags = {}) {
+  if (!name) throw new Error('pack init requires a pack name');
+  const base = path.resolve(root, flags.to || flags.path || 'packs');
+  const dir = path.join(base, name);
+  const status = exists(path.join(dir, 'pack.json')) ? 'EXISTS' : 'CREATED';
+  ensureDir(dir);
+  for (const folder of PACK_LAYOUT) ensureDir(path.join(dir, folder));
+  if (status === 'CREATED') {
+    writeJson(path.join(dir, 'pack.json'), {
+      name,
+      version: '0.1.0',
+      description: `${name} AhRE pack`,
+      entryRecipe: 'example.ensure'
+    });
+    const templateDir = path.join(dir, 'templates', 'example.file');
+    ensureDir(path.join(templateDir, 'files', 'src'));
+    writeJson(path.join(templateDir, 'template.json'), {
+      name: 'example.file',
+      description: 'Create one example file.',
+      variables: ['Name'],
+      files: [{ source: 'files/src/__Name__.ts.tpl', target: 'src/{{Name}}.ts' }]
+    });
+    fs.writeFileSync(path.join(templateDir, 'files', 'src', '__Name__.ts.tpl'), 'export class {{Name}} {}\n');
+    writeJson(path.join(dir, 'intents', 'example.file.ensure.json'), {
+      name: 'example.file.ensure',
+      description: 'Ensure the example file.',
+      template: 'example.file'
+    });
+    writeJson(path.join(dir, 'recipes', 'example.ensure.json'), {
+      name: 'example.ensure',
+      description: 'Example recipe composed from one intent.',
+      tasks: [{ id: 'file', intent: 'example.file.ensure' }]
+    });
+    writeJson(path.join(dir, 'policies', 'default.json'), {
+      name: 'default',
+      description: 'Default pack policy.',
+      defaults: {}
+    });
+    fs.writeFileSync(path.join(dir, 'README.md'), `# ${name}\n\nAhRE pack layout:\n\n- templates/: real file trees plus template.json\n- intents/: deterministic template operations\n- recipes/: ordered task composition\n- policies/: defaults and constraints\n`);
+  }
+  return { status, name, path: rel(root, dir) };
+}
+
+function validatePack(pack) {
+  const errors = [];
+  const warnings = [];
+  if (!pack) return { status: 'FAILED', errors: [{ code: 'PACK_NOT_FOUND', message: 'Pack was not found.' }], warnings };
+  const names = (items) => new Set((items || []).map((item) => item.name));
+  const templateNames = names(pack.templates);
+  const intentNames = names(pack.intents);
+  const recipeNames = names(pack.recipes);
+  for (const template of pack.templates || []) {
+    if (!template.name) errors.push({ code: 'TEMPLATE_NAME_REQUIRED', file: template.directory });
+    for (const file of template.files || []) {
+      const source = path.join(pack.directory, 'templates', template.directory, file.source || '');
+      if (!file.source || !exists(source)) errors.push({ code: 'TEMPLATE_SOURCE_MISSING', template: template.name, source: file.source });
+      if (!file.target) errors.push({ code: 'TEMPLATE_TARGET_REQUIRED', template: template.name });
+    }
+  }
+  for (const intent of pack.intents || []) {
+    if (!intent.name) errors.push({ code: 'INTENT_NAME_REQUIRED' });
+    if (intent.template && !templateNames.has(intent.template)) errors.push({ code: 'UNKNOWN_TEMPLATE', intent: intent.name, template: intent.template });
+  }
+  for (const recipe of pack.recipes || []) {
+    if (!recipe.name) errors.push({ code: 'RECIPE_NAME_REQUIRED' });
+    for (const task of recipe.tasks || []) {
+      if (task.intent && !intentNames.has(task.intent)) errors.push({ code: 'UNKNOWN_INTENT', recipe: recipe.name, task: task.id, intent: task.intent });
+      if (task.recipe && !recipeNames.has(task.recipe)) errors.push({ code: 'UNKNOWN_RECIPE', recipe: recipe.name, task: task.id, dependency: task.recipe });
+    }
+  }
+  if (!(pack.templates || []).length) warnings.push({ code: 'NO_TEMPLATES', message: 'Pack has no templates.' });
+  return { status: errors.length ? 'FAILED' : 'OK', errors, warnings, counts: { templates: pack.templates?.length || 0, intents: pack.intents?.length || 0, recipes: pack.recipes?.length || 0, policies: pack.policies?.length || 0 } };
+}
+
+
+function templateVariables(flags) {
+  const vars = {};
+  for (const [key, value] of Object.entries(flags || {})) {
+    vars[key] = value;
+    vars[key.toLowerCase()] = value;
+    vars[key.charAt(0).toUpperCase() + key.slice(1)] = value;
+  }
+  return vars;
+}
+
+function renderPackText(text, variables) {
+  return String(text).replace(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g, (_, key) => {
+    const value = variables[key] ?? variables[key.toLowerCase()];
+    if (value === undefined) throw new Error(`Missing template variable: ${key}`);
+    return String(value);
+  });
+}
+
+function genericRecipeOperations(pack, recipe, root, flags) {
+  const intents = new Map((pack.intents || []).map((item) => [item.name, item]));
+  const templates = new Map((pack.templates || []).map((item) => [item.name, item]));
+  const variables = templateVariables(flags);
+  const operations = [];
+  for (const task of recipe.tasks || []) {
+    if (!task.intent) throw new Error(`Generic recipe task ${task.id || '<unnamed>'} must reference an intent.`);
+    const intent = intents.get(task.intent);
+    if (!intent) throw new Error(`Unknown intent ${task.intent} in recipe ${recipe.name}.`);
+    const template = templates.get(intent.template);
+    if (!template) throw new Error(`Unknown template ${intent.template} in intent ${intent.name}.`);
+    const templateDir = path.join(pack.directory, 'templates', template.directory);
+    for (const mapping of template.files || []) {
+      const source = path.join(templateDir, mapping.source);
+      const target = path.resolve(root, renderPackText(mapping.target, variables));
+      const content = renderPackText(fs.readFileSync(source, 'utf8'), variables);
+      operations.push({ task: task.id, intent: intent.name, template: template.name, source, target, content });
+    }
+  }
+  return operations;
+}
+
+async function runGenericPackRecipe(root, pack, recipe, action, flags) {
+  const operations = genericRecipeOperations(pack, recipe, root, flags);
+  const plan = {
+    status: 'OK', mode: 'plan', pack: pack.name, recipe: recipe.name, root,
+    wouldCreate: operations.filter((op) => !exists(op.target)).map((op) => rel(root, op.target)),
+    alreadyExists: operations.filter((op) => exists(op.target)).map((op) => rel(root, op.target)),
+    conflicts: [], warnings: [],
+    tasks: operations.map((op) => ({ id: op.task, intent: op.intent, template: op.template, target: rel(root, op.target) }))
+  };
+  if (action === 'plan') return plan;
+  const effects = newEffects();
+  for (const op of operations) {
+    if (exists(op.target)) {
+      const current = fs.readFileSync(op.target, 'utf8');
+      if (current === op.content) effects.existing.push(op.target);
+      else effects.blocked.push({ path: op.target, reason: 'Target exists with different content. Generic packs never overwrite by default.' });
+      continue;
+    }
+    ensureDir(path.dirname(op.target));
+    fs.writeFileSync(op.target, op.content);
+    effects.created.push(op.target);
+  }
+  return withPostMutationQuality(root, {
+    status: effects.blocked.length ? 'BLOCKED' : 'OK', mode: 'apply', pack: pack.name, recipe: recipe.name,
+    effects: normalizeEffectPaths(root, effects),
+    tasks: plan.tasks,
+    nextForLLM: ['Use the returned task targets and quality report before reading generated files.']
+  }, flags, effects);
+}
+
 const ARCHITECTURE_PACK = {
   name: 'ms-expeditions-clean-ddd',
-  version: '0.6.0',
+  version: '0.7.0',
   source: 'ARCHITECTURE.md',
   description: 'AhRE architecture pack for TypeScript/Node.js backend services using Clean Architecture, Hexagonal adapters, DDD bounded contexts, CQRS, DI YAML, AMQP/SQS, Mongo/TypeORM/Redis/S3, PDF/XLSX, JWT/RBAC, Jest and Cucumber.',
   policies: [
@@ -1812,17 +2028,70 @@ async function withPostMutationQuality(root, payload, flags, effects) {
   return { ...payload, status, graph: graph ? { status: 'UPDATED', graphPath: rel(root, graphPath(root)), fileCount: Object.keys(graph.files).length } : (payload.graph || { status: 'SKIPPED' }), quality, nextForLLM };
 }
 
+
+const PUBLIC_CAPABILITIES = [
+  { id: 'service.http', recipe: 'architecture.service.ensure', aliases: ['web service','http service','web server','api service','rest service'], tags: ['service','http','api','typescript'], required: ['service'], example: 'ahre code service.http --service orders --json', description: 'Ensure a complete TypeScript HTTP service workspace.' },
+  { id: 'context.ddd', recipe: 'bounded-context.ensure', aliases: ['bounded context','ddd context','domain context'], tags: ['ddd','context','domain'], required: ['context'], example: 'ahre code context.ddd --context Orders --json', description: 'Ensure a Clean Architecture bounded context.' },
+  { id: 'entity.create', recipe: 'entity.capability.ensure', aliases: ['create entity','entity endpoint','aggregate create','crud create'], tags: ['entity','aggregate','controller','usecase','repository'], required: ['entity','context'], example: 'ahre code entity.create --entity Order --context Orders --json', description: 'Ensure an entity create capability across all layers.' },
+  { id: 'consumer.event', recipe: 'consumer.event.ensure', aliases: ['event consumer','message consumer','queue consumer'], tags: ['event','consumer','amqp','sqs'], required: ['event','context'], example: 'ahre code consumer.event --event OrderWasCreated --context Orders --json', description: 'Ensure an event consumer and command test skeleton.' },
+  { id: 'document.pdf', recipe: 'document.pdf.ensure', aliases: ['pdf renderer','generate pdf'], tags: ['pdf','document'], required: ['name','context'], example: 'ahre code document.pdf --name Invoice --context Orders --json', description: 'Ensure a PDF renderer adapter and tests.' },
+  { id: 'document.xlsx', recipe: 'document.xlsx.ensure', aliases: ['xlsx exporter','excel export'], tags: ['xlsx','excel','document'], required: ['name','context'], example: 'ahre code document.xlsx --name OrdersReport --context Orders --json', description: 'Ensure an XLSX exporter adapter and tests.' },
+  { id: 'slot.insert', internal: 'slot.insert', aliases: ['insert logic','modify slot','write slot'], tags: ['slot','modify','logic'], required: ['slot','content|content-file'], example: 'ahre code slot.insert --slot Orders.Order.create.domainRules --content-file ./rules.ts --json', description: 'Insert supplied code into a deterministic AhRE slot.' }
+];
+
+function capabilityCatalog(root) {
+  const catalog = [...PUBLIC_CAPABILITIES];
+  for (const pack of discoverPacks(root)) {
+    for (const recipe of pack.recipes || []) {
+      if (catalog.some((item) => item.recipe === recipe.name || item.id === recipe.name)) continue;
+      catalog.push({
+        id: recipe.id || recipe.name.replace(/\.ensure$/, ''),
+        recipe: recipe.name,
+        pack: pack.name,
+        aliases: recipe.aliases || [],
+        tags: recipe.tags || [],
+        required: recipe.required || [],
+        example: recipe.example || `ahre code ${recipe.id || recipe.name.replace(/\.ensure$/, '')} --json`,
+        description: recipe.description || `Execute ${recipe.name}.`
+      });
+    }
+  }
+  return catalog;
+}
+
+function scoreCapability(item, query) {
+  const terms = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+  const id = item.id.toLowerCase();
+  const aliases = (item.aliases || []).map(String).map((v) => v.toLowerCase());
+  const tags = (item.tags || []).map(String).map((v) => v.toLowerCase());
+  const description = String(item.description || '').toLowerCase();
+  let score = 0;
+  const reasons = [];
+  for (const term of terms) {
+    if (id === term || id.split('.').includes(term)) { score += 40; reasons.push(`id:${term}`); }
+    if (aliases.some((alias) => alias.includes(term))) { score += 30; reasons.push(`alias:${term}`); }
+    if (tags.includes(term)) { score += 20; reasons.push(`tag:${term}`); }
+    if (description.includes(term)) { score += 5; reasons.push(`description:${term}`); }
+  }
+  if (String(query || '').toLowerCase() === id) score += 100;
+  return { score, reasons: [...new Set(reasons)] };
+}
+
 export class AhreCli {
   constructor({ cwd }) {
     this.cwd = cwd;
   }
 
   async run(argv) {
-    if (argv.length === 0 || argv.includes('--help') || argv[0] === 'help') return this.help();
+    if (argv.length === 0) return this.help();
+    if (argv[0] === 'help' || argv.includes('--help')) { const parsedHelp = parseArgs(argv[0] === 'help' ? argv.slice(1) : argv.filter((item) => item !== '--help')); return this.help(parsedHelp.positional[0], parsedHelp.flags.json); }
     if (argv.includes('--version') || argv[0] === 'version') return this.output({ status: 'OK', version: VERSION }, true);
     const { positional, flags } = parseArgs(argv);
     const [group, action, subject, maybe] = positional;
 
+    if (group === 'find') return this.handleFind([action, subject, maybe].filter(Boolean).join(' '), flags);
+    if (group === 'inspect') return await this.handleInspect(action || 'last', subject, maybe, flags);
+    if (group === 'doctor') return await this.handleDoctor(flags);
     if (group === 'intents') return this.handleIntents(action, subject, flags);
     if (group === 'recipe') return await this.handleRecipe(action, subject, flags);
     if (group === 'ensure') return await this.handleEnsure(action, subject, maybe, flags);
@@ -1841,8 +2110,23 @@ export class AhreCli {
     throw new Error(`Unknown command group: ${group}`);
   }
 
-  help() {
-    console.log(`AhRE — ArcHitecture Recipe Engine CLI ${VERSION}\n\nUsage:\n  ahre intents list --json\n  ahre intents search <query> --json\n  ahre intents describe <intent> --json\n\n  ahre recipe plan entity.capability.ensure --entity User --context Users --json\n  ahre recipe apply entity.capability.ensure --entity User --context Users --json\n\n  ahre ensure entity --entity User --context Users --json\n  ahre ensure method --entity User --context Users --method changeEmail --json\n\n  ahre inventory get entity Users.User --json\n  ahre inventory list entities --json\n  ahre verify architecture --json\n\n  ahre skill list --all --json\n  ahre skill show usage --json\n  ahre skill install usage --target project --json\n  ahre skill doctor --target project --json\n\n  ahre slot list --entity Users.User --json\n  ahre slot get Users.User.create.domainRules --json\n  ahre code insert-slot --slot Users.User.create.domainRules --content-file ./snippet.ts --json\n  ahre task list --json\n`);
+  help(topic, asJson = false) {
+    const root = serviceRoot(this.cwd, {});
+    if (topic) {
+      const capability = capabilityCatalog(root).find((item) => item.id === topic);
+      if (capability) return this.output({ status: 'OK', capability: { id: capability.id, description: capability.description, required: capability.required || [], aliases: capability.aliases || [], tags: capability.tags || [], example: capability.example }, workflow: ['Use the exact id with `ahre code`.', 'Read the returned slots, tasks, graph, quality and next actions.', 'Do not inspect generated files first.'] }, asJson);
+      if (topic === 'authoring') return this.output({ status: 'OK', topic, summary: 'Capabilities are backed by composable filesystem definitions. Use `ahre doctor --json` to validate all definitions. Advanced compatibility commands remain available but are not required for runtime use.' }, asJson);
+      return this.output({ status: 'NOT_FOUND', topic, instruction: `Run \`ahre find "${topic}" --json\` to discover the matching capability.` }, asJson);
+    }
+    const payload = { status: 'OK', version: VERSION, commands: [
+      { command: 'find', usage: 'ahre find "<task>" --json', purpose: 'Discover capabilities.' },
+      { command: 'help', usage: 'ahre help <capability> --json', purpose: 'Learn exact arguments and example.' },
+      { command: 'code', usage: 'ahre code <capability> [arguments] --json', purpose: 'Create or converge code and run checks.' },
+      { command: 'inspect', usage: 'ahre inspect last|<subject> --json', purpose: 'Read consolidated context.' },
+      { command: 'doctor', usage: 'ahre doctor --json', purpose: 'Validate definitions and repository health.' }
+    ], examples: ['ahre find "http service" --json', 'ahre code service.http --service orders --json', 'ahre code entity.create --entity Order --context Orders --json', 'ahre inspect last --json'] };
+    if (asJson) return this.output(payload, true);
+    console.log(`AhRE — ArcHitecture Recipe Engine CLI ${VERSION}\n\nCore workflow:\n  ahre find "<what you need>" --json\n  ahre help <capability> --json\n  ahre code <capability> [arguments] --json\n  ahre inspect last --json\n  ahre doctor --json\n\nRun \`ahre help <capability> --json\` for exact arguments.`);
   }
 
   output(payload, asJson = false) {
@@ -1852,6 +2136,59 @@ export class AhreCli {
     } else {
       console.log(payload.summary ?? JSON.stringify(payload, null, 2));
     }
+  }
+
+
+  handleFind(query, flags) {
+    const root = serviceRoot(this.cwd, flags);
+    if (!query) return this.output({ status: 'OK', capabilities: capabilityCatalog(root).map(({ recipe, internal, ...item }) => item) }, flags.json);
+    const matches = capabilityCatalog(root)
+      .map((item) => ({ ...item, ...scoreCapability(item, query) }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+      .map(({ recipe, internal, ...item }) => item);
+    return this.output({ status: matches.length ? 'OK' : 'NOT_FOUND', query, matches, instruction: matches.length ? 'Use the exact capability id with `ahre code <id>`.' : 'Run `ahre find --json` to list all capabilities.' }, flags.json);
+  }
+
+  async handlePublicCapability(capabilityId, flags) {
+    const root = serviceRoot(this.cwd, flags);
+    const capability = capabilityCatalog(root).find((item) => item.id === capabilityId);
+    if (!capability) return this.output({ status: 'NOT_FOUND', capability: capabilityId, instruction: `Run \`ahre find "${capabilityId}" --json\`.` }, flags.json);
+    if (capability.internal === 'slot.insert') return await this.handleCodeInsertSlot(flags);
+    if (capability.pack && capability.recipe) {
+      const pack = resolvePack(root, capability.pack);
+      const recipe = pack?.recipes?.find((item) => item.name === capability.recipe);
+      if (!pack || !recipe) return this.output({ status: 'NOT_FOUND', capability: capabilityId }, flags.json);
+      return this.output(await runGenericPackRecipe(root, pack, recipe, 'apply', flags), flags.json);
+    }
+    return await this.handleRecipe('apply', capability.recipe, flags);
+  }
+
+  async handleInspect(subject, maybe, unused, flags) {
+    const root = serviceRoot(this.cwd, flags);
+    const inv = loadInventory(root);
+    const graph = readGraph(root);
+    const operations = inv.operations || [];
+    if (!subject || subject === 'last') {
+      const last = operations.at(-1) || null;
+      return this.output({ status: last ? 'OK' : 'EMPTY', subject: 'last', operation: last, slots: last?.subject ? Object.values(inv.slots || {}).filter((slot) => slot.id.includes(last.subject)) : [], tasks: last?.subject ? Object.values(inv.tasks || {}).filter((task) => task.subject === last.subject || task.id.includes(last.subject)) : [], graph: graph ? { status: 'AVAILABLE', path: rel(root, graphPath(root)), files: Object.keys(graph.files || {}).length } : { status: 'MISSING' } }, flags.json);
+    }
+    const key = [subject, maybe].filter(Boolean).join(' ');
+    const results = searchGraphAndInventory(root, key);
+    const slots = Object.values(inv.slots || {}).filter((slot) => slot.id.includes(key) || slot.path?.includes(key));
+    const tasks = Object.values(inv.tasks || {}).filter((task) => task.subject === key || task.id.includes(key));
+    return this.output({ status: results.length || slots.length || tasks.length ? 'OK' : 'NOT_FOUND', subject: key, results, slots, tasks }, flags.json);
+  }
+
+  async handleDoctor(flags) {
+    const root = serviceRoot(this.cwd, flags);
+    const packs = discoverPacks(root);
+    const packReports = packs.map((pack) => ({ name: pack.name, path: rel(root, pack.directory), ...validatePack(pack) }));
+    const inventory = loadInventory(root);
+    const slotIntegrity = verifySlotIntegrity(root, inventory);
+    const architecture = verifyArchitecture(root);
+    const failed = packReports.some((report) => report.status === 'FAILED') || slotIntegrity.status === 'FAILED' || architecture.status === 'FAILED';
+    return this.output({ status: failed ? 'FAILED' : 'OK', root, capabilities: capabilityCatalog(root).length, packs: packReports, architecture, slots: slotIntegrity, graph: exists(graphPath(root)) ? { status: 'OK', path: rel(root, graphPath(root)) } : { status: 'MISSING', note: 'It will be created automatically after a mutation.' } }, flags.json);
   }
 
   handleIntents(action, subject, flags) {
@@ -1872,15 +2209,27 @@ export class AhreCli {
   }
 
   async handleRecipe(action, subject, flags) {
+    const discoveryRoot = serviceRoot(this.cwd, { root: flags.root });
+    const requestedPackName = flags.pack || ARCHITECTURE_PACK.name;
+    const requestedPack = resolvePack(discoveryRoot, requestedPackName);
+    const availableRecipes = requestedPack?.recipes || ARCHITECTURE_PACK.recipes;
     if (action === 'list') {
-      return this.output({ status: 'OK', pack: ARCHITECTURE_PACK.name, recipes: ARCHITECTURE_PACK.recipes }, flags.json);
+      return this.output({ status: 'OK', pack: requestedPackName, recipes: availableRecipes }, flags.json);
     }
     if (action === 'describe' || action === 'show') {
-      const recipe = ARCHITECTURE_PACK.recipes.find((item) => item.name === subject);
-      if (!recipe) return this.output({ status: 'NOT_FOUND', recipe: subject }, flags.json);
-      return this.output({ status: 'OK', pack: ARCHITECTURE_PACK.name, recipe }, flags.json);
+      const recipe = availableRecipes.find((item) => item.name === subject);
+      if (!recipe) return this.output({ status: 'NOT_FOUND', pack: requestedPackName, recipe: subject }, flags.json);
+      return this.output({ status: 'OK', pack: requestedPackName, recipe }, flags.json);
     }
     if (!['plan', 'apply'].includes(action)) throw new Error(`Unknown recipe action: ${action}`);
+    const builtInRecipeNames = new Set(ARCHITECTURE_PACK.recipes.map((item) => item.name));
+    if (requestedPack && requestedPackName !== ARCHITECTURE_PACK.name) {
+      const recipe = availableRecipes.find((item) => item.name === subject);
+      if (!recipe) return this.output({ status: 'NOT_FOUND', pack: requestedPackName, recipe: subject }, flags.json);
+      const executionRoot = serviceRoot(this.cwd, flags);
+      return this.output(await runGenericPackRecipe(executionRoot, requestedPack, recipe, action, flags), flags.json);
+    }
+    if (!builtInRecipeNames.has(subject)) return this.output({ status: 'NOT_FOUND', pack: requestedPackName, recipe: subject }, flags.json);
 
     if (subject === 'architecture.service.ensure') {
       const root = serviceRoot(this.cwd, { root: flags.root });
@@ -2190,7 +2539,8 @@ export class AhreCli {
 
 
   async handleCode(action, subject, maybe, flags) {
-    // Code is an agent-friendly alias namespace over ensure/recipe primitives.
+    if (action && (action.includes('.') || capabilityCatalog(serviceRoot(this.cwd, flags)).some((item) => item.id === action))) return await this.handlePublicCapability(action, flags);
+    // Backward-compatible aliases over ensure/recipe primitives.
     if (action === 'ensure') return await this.handleEnsure(subject, maybe, undefined, flags);
     if (action === 'method') return await this.handleEnsure('method', subject, maybe, flags);
     if (action === 'entity') return await this.handleEnsure('entity', subject, maybe, flags);
@@ -2335,20 +2685,32 @@ export class AhreCli {
   }
 
   handlePack(action, subject, maybe, flags) {
-    if (action === 'list' || !action) return this.output({ status: 'OK', pack: ARCHITECTURE_PACK }, flags.json);
-    if (action === 'show' || action === 'describe') {
-      return this.output({ status: 'OK', pack: ARCHITECTURE_PACK.name, version: ARCHITECTURE_PACK.version, policies: ARCHITECTURE_PACK.policies, templates: ARCHITECTURE_PACK.templates, recipes: ARCHITECTURE_PACK.recipes, intents: ARCHITECTURE_PACK.intents }, flags.json);
+    const root = serviceRoot(this.cwd, flags);
+    if (action === 'list' || !action) {
+      const packs = discoverPacks(root).map((pack) => ({ name: pack.name, version: pack.version, description: pack.description, path: rel(root, pack.directory) }));
+      if (!packs.some((pack) => pack.name === ARCHITECTURE_PACK.name)) packs.push({ name: ARCHITECTURE_PACK.name, version: ARCHITECTURE_PACK.version, description: ARCHITECTURE_PACK.description, path: `packs/${ARCHITECTURE_PACK.name}` });
+      return this.output({ status: 'OK', packs }, flags.json);
+    }
+    if (action === 'init' || action === 'create') return this.output(scaffoldPack(root, subject, flags), flags.json);
+    const packName = subject || flags.pack || ARCHITECTURE_PACK.name;
+    const pack = resolvePack(root, packName);
+    if (action === 'show' || action === 'describe' || action === 'tree') {
+      if (!pack) return this.output({ status: 'NOT_FOUND', pack: packName }, flags.json);
+      return this.output({ status: 'OK', pack: pack.name, version: pack.version, path: rel(root, pack.directory), layout: { templates: pack.templates, intents: pack.intents, recipes: pack.recipes, policies: pack.policies } }, flags.json);
+    }
+    if (action === 'validate' || action === 'doctor') {
+      const report = validatePack(pack);
+      return this.output({ pack: packName, ...report }, flags.json);
     }
     if (action === 'export') {
-      const root = serviceRoot(this.cwd, flags);
-      const to = flags.to || flags.path || '.ahre/architecture-packs';
-      const dir = path.resolve(root, to, ARCHITECTURE_PACK.name);
-      ensureDir(dir);
-      writeJson(path.join(dir, 'pack.json'), ARCHITECTURE_PACK);
-      for (const item of ARCHITECTURE_PACK.templates) writeJson(path.join(dir, 'templates', `${item.name}.json`), item);
-      for (const item of ARCHITECTURE_PACK.recipes) writeJson(path.join(dir, 'recipes', `${item.name}.json`), item);
-      for (const item of ARCHITECTURE_PACK.intents) writeJson(path.join(dir, 'intents', `${item.name}.json`), item);
-      return this.output({ status: 'OK', action: 'EXPORTED', pack: ARCHITECTURE_PACK.name, path: rel(root, dir) }, flags.json);
+      const to = flags.to || flags.path || 'packs';
+      const dir = path.resolve(root, to, packName);
+      if (pack?.directory && exists(pack.directory)) copyDirectory(pack.directory, dir);
+      else {
+        ensureDir(dir);
+        writeJson(path.join(dir, 'pack.json'), ARCHITECTURE_PACK);
+      }
+      return this.output({ status: 'OK', action: 'EXPORTED', pack: packName, path: rel(root, dir) }, flags.json);
     }
     throw new Error(`Unknown pack action: ${action}`);
   }

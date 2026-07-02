@@ -1,0 +1,11 @@
+{
+  "name": "runtime.compose",
+  "description": "# Template: runtime.compose",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/runtime.compose.txt"
+    }
+  ]
+}

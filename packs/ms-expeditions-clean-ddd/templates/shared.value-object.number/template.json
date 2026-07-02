@@ -1,0 +1,11 @@
+{
+  "name": "shared.value-object.number",
+  "description": "# Template: shared.value-object.number",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/shared.value-object.number.txt"
+    }
+  ]
+}

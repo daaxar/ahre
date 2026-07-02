@@ -1,0 +1,11 @@
+{
+  "name": "service.package-json",
+  "description": "# Template: service.package-json",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/service.package-json.txt"
+    }
+  ]
+}

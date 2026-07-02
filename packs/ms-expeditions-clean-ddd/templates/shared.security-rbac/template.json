@@ -1,0 +1,11 @@
+{
+  "name": "shared.security-rbac",
+  "description": "# Template: shared.security-rbac",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/shared.security-rbac.txt"
+    }
+  ]
+}

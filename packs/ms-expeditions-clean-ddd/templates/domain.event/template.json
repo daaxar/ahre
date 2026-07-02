@@ -1,0 +1,11 @@
+{
+  "name": "domain.event",
+  "description": "# Template: domain.event",
+  "variables": [],
+  "files": [
+    {
+      "source": "files/template.tpl",
+      "target": "generated/domain.event.txt"
+    }
+  ]
+}
