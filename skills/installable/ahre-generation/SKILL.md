@@ -1,22 +1,18 @@
 ---
-name: "AhRE Capability Authoring"
-description: "Create or extend filesystem capabilities used internally by the minimal AhRE code command."
+name: "AhRE Generation"
+description: "Discover and execute deterministic code-generation capabilities through the minimal AhRE interface."
 ---
 
-# AhRE Capability Authoring
+# AhRE Generation
 
-Use only when creating or extending AhRE definitions.
-
-A public capability is invoked with:
+For normal repository work:
 
 ```bash
+ahre find "<task>" --json
+ahre help <capability> --json
 ahre code <capability> [arguments] --json
 ```
 
-Definitions may compose other definitions, render file trees, expose slots, create tasks, and declare checks. Keep the filesystem navigable and metadata declarative. Runtime users should not need to know whether a definition is internally a recipe, intent, template, or pack.
+Never invent capability IDs or arguments. Do not inspect internal packs, recipes, intents or templates during normal generation. Use the returned tasks, artifacts, slots, diagnostics and quality report. Use `ahre inspect last --json` when more context is required.
 
-Validate all installed definitions with:
-
-```bash
-ahre doctor --json
-```
+Only load an authoring skill when the user explicitly asks to create or change AhRE definitions.

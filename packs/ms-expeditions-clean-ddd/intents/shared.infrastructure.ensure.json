@@ -1,0 +1,5 @@
+{
+  "name": "shared.infrastructure.ensure",
+  "description": "Ensure shared messaging, queue, security and logging contracts.",
+  "template": "shared.infrastructure"
+}

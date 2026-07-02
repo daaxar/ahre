@@ -1,0 +1,29 @@
+{
+  "name": "shared.infrastructure",
+  "description": "Shared messaging, security and logging ports/adapters.",
+  "variables": [
+    "service"
+  ],
+  "files": [
+    {
+      "source": "files/src/Shared/Infrastructure/MessageBus/MessageBus.ts.tpl",
+      "target": "servs/{{service}}/src/Shared/Infrastructure/MessageBus/MessageBus.ts"
+    },
+    {
+      "source": "files/src/Shared/Infrastructure/MessageQueue/SqsMessageQueue.ts.tpl",
+      "target": "servs/{{service}}/src/Shared/Infrastructure/MessageQueue/SqsMessageQueue.ts"
+    },
+    {
+      "source": "files/src/Shared/Infrastructure/Security/RbacPolicy.ts.tpl",
+      "target": "servs/{{service}}/src/Shared/Infrastructure/Security/RbacPolicy.ts"
+    },
+    {
+      "source": "files/src/Shared/Infrastructure/Security/JwtVerifier.ts.tpl",
+      "target": "servs/{{service}}/src/Shared/Infrastructure/Security/JwtVerifier.ts"
+    },
+    {
+      "source": "files/src/Shared/Infrastructure/Logs/WinstonLogger.ts.tpl",
+      "target": "servs/{{service}}/src/Shared/Infrastructure/Logs/WinstonLogger.ts"
+    }
+  ]
+}

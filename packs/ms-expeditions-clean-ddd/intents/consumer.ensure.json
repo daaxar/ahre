@@ -1,6 +1,5 @@
 {
   "name": "consumer.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "level": "component"
+  "description": "Ensure event consumer.",
+  "template": "consumer.event"
 }

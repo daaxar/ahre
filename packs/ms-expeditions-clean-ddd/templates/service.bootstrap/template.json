@@ -1,0 +1,21 @@
+{
+  "name": "service.bootstrap",
+  "description": "Service entrypoint and kernel.",
+  "variables": [
+    "service"
+  ],
+  "files": [
+    {
+      "source": "files/src/index.ts.tpl",
+      "target": "servs/{{service}}/src/index.ts"
+    },
+    {
+      "source": "files/src/Kernel.ts.tpl",
+      "target": "servs/{{service}}/src/Kernel.ts"
+    },
+    {
+      "source": "files/config/container/services.yaml.tpl",
+      "target": "servs/{{service}}/config/container/services.yaml"
+    }
+  ]
+}

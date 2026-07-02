@@ -1,0 +1,14 @@
+{
+  "name": "document.xlsx",
+  "description": "XLSX exporter adapter.",
+  "variables": [
+    "context",
+    "name"
+  ],
+  "files": [
+    {
+      "source": "files/src/Context/Infrastructure/Xlsx/NameXlsxExporter.ts.tpl",
+      "target": "src/{{context}}/Infrastructure/Xlsx/{{name}}XlsxExporter.ts"
+    }
+  ]
+}

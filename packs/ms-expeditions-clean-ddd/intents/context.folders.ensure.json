@@ -1,6 +1,5 @@
 {
   "name": "context.folders.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "level": "component"
+  "description": "Ensure bounded-context layer folders.",
+  "template": "context.ddd"
 }

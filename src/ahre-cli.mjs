@@ -5,7 +5,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-const VERSION = '0.8.0';
+const VERSION = '0.8.1';
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const INTENTS = [
@@ -1492,11 +1492,29 @@ async function runGenericPackRecipe(root, pack, recipe, action, flags) {
     fs.writeFileSync(op.target, op.content);
     effects.created.push(op.target);
   }
+  const logicSlots = [];
+  for (const op of operations) {
+    const pattern = /AHRE_SLOT_START:([^\n\r]+)([\s\S]*?)AHRE_SLOT_END:\1/g;
+    let match;
+    while ((match = pattern.exec(op.content)) !== null) {
+      const body = String(match[2] || '').split(/\r?\n/).map((line) => line.replace(/^\s*\/\/\s?/, '').trim()).filter(Boolean);
+      logicSlots.push({
+        id: match[1].trim(),
+        path: rel(root, op.target),
+        markerStart: `AHRE_SLOT_START:${match[1].trim()}`,
+        markerEnd: `AHRE_SLOT_END:${match[1].trim()}`,
+        purpose: body[0] || 'Business-specific extension point.'
+      });
+    }
+  }
   return withPostMutationQuality(root, {
     status: effects.blocked.length ? 'BLOCKED' : 'OK', mode: 'apply', pack: pack.name, recipe: recipe.name,
     effects: normalizeEffectPaths(root, effects),
     tasks: plan.tasks,
-    nextForLLM: ['Use the returned task targets and quality report before reading generated files.']
+    logicSlots,
+    nextForLLM: logicSlots.length
+      ? ['Do not inspect generated files first.', 'Use the returned logicSlots as exact insertion coordinates for business-specific code.', 'Use the returned task targets and quality report for the rest of the generated structure.']
+      : ['Use the returned task targets and quality report before reading generated files.']
   }, flags, effects);
 }
 
@@ -2030,12 +2048,6 @@ async function withPostMutationQuality(root, payload, flags, effects) {
 
 
 const PUBLIC_CAPABILITIES = [
-  { id: 'service.http', recipe: 'architecture.service.ensure', aliases: ['web service','http service','web server','api service','rest service'], tags: ['service','http','api','typescript'], required: ['service'], example: 'ahre code service.http --service orders --json', description: 'Ensure a complete TypeScript HTTP service workspace.' },
-  { id: 'context.ddd', recipe: 'bounded-context.ensure', aliases: ['bounded context','ddd context','domain context'], tags: ['ddd','context','domain'], required: ['context'], example: 'ahre code context.ddd --context Orders --json', description: 'Ensure a Clean Architecture bounded context.' },
-  { id: 'entity.create', recipe: 'entity.capability.ensure', aliases: ['create entity','entity endpoint','aggregate create','crud create'], tags: ['entity','aggregate','controller','usecase','repository'], required: ['entity','context'], example: 'ahre code entity.create --entity Order --context Orders --json', description: 'Ensure an entity create capability across all layers.' },
-  { id: 'consumer.event', recipe: 'consumer.event.ensure', aliases: ['event consumer','message consumer','queue consumer'], tags: ['event','consumer','amqp','sqs'], required: ['event','context'], example: 'ahre code consumer.event --event OrderWasCreated --context Orders --json', description: 'Ensure an event consumer and command test skeleton.' },
-  { id: 'document.pdf', recipe: 'document.pdf.ensure', aliases: ['pdf renderer','generate pdf'], tags: ['pdf','document'], required: ['name','context'], example: 'ahre code document.pdf --name Invoice --context Orders --json', description: 'Ensure a PDF renderer adapter and tests.' },
-  { id: 'document.xlsx', recipe: 'document.xlsx.ensure', aliases: ['xlsx exporter','excel export'], tags: ['xlsx','excel','document'], required: ['name','context'], example: 'ahre code document.xlsx --name OrdersReport --context Orders --json', description: 'Ensure an XLSX exporter adapter and tests.' },
   { id: 'slot.insert', internal: 'slot.insert', aliases: ['insert logic','modify slot','write slot'], tags: ['slot','modify','logic'], required: ['slot','content|content-file'], example: 'ahre code slot.insert --slot Orders.Order.create.domainRules --content-file ./rules.ts --json', description: 'Insert supplied code into a deterministic AhRE slot.' }
 ];
 

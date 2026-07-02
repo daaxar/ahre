@@ -1,6 +1,5 @@
 {
   "name": "controller.http.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "level": "component"
+  "description": "Ensure HTTP controller.",
+  "template": "entity.controller-http"
 }

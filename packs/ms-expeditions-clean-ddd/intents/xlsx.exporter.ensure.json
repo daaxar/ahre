@@ -1,6 +1,5 @@
 {
   "name": "xlsx.exporter.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "level": "component"
+  "description": "Ensure XLSX exporter.",
+  "template": "document.xlsx"
 }

@@ -1,6 +1,5 @@
 {
   "name": "repository.mongo.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "level": "component"
+  "description": "Ensure Mongo repository adapter.",
+  "template": "entity.repository-mongo"
 }

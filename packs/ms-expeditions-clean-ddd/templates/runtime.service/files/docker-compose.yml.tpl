@@ -1,0 +1,5 @@
+services:
+  {{service}}:
+    build: .
+    env_file: .env.dev
+    ports: ["3000:3000"]

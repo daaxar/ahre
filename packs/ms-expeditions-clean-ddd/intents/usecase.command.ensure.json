@@ -1,6 +1,5 @@
 {
   "name": "usecase.command.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "level": "component"
+  "description": "Ensure create use case.",
+  "template": "entity.usecase-create"
 }

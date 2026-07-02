@@ -1,6 +1,5 @@
 {
   "name": "entity.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "level": "component"
+  "description": "Ensure aggregate and identifier.",
+  "template": "entity.aggregate"
 }

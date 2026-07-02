@@ -1,0 +1,21 @@
+{
+  "name": "service.workspace",
+  "description": "TypeScript Node service workspace metadata.",
+  "variables": [
+    "service"
+  ],
+  "files": [
+    {
+      "source": "files/package.json.tpl",
+      "target": "servs/{{service}}/package.json"
+    },
+    {
+      "source": "files/tsconfig.json.tpl",
+      "target": "servs/{{service}}/tsconfig.json"
+    },
+    {
+      "source": "files/jest.config.cjs.tpl",
+      "target": "servs/{{service}}/jest.config.cjs"
+    }
+  ]
+}

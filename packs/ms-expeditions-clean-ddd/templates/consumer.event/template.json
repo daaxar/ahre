@@ -1,0 +1,14 @@
+{
+  "name": "consumer.event",
+  "description": "Event consumer skeleton.",
+  "variables": [
+    "context",
+    "event"
+  ],
+  "files": [
+    {
+      "source": "files/src/Context/Infrastructure/UI/Consumer/EventConsumer.ts.tpl",
+      "target": "src/{{context}}/Infrastructure/UI/Consumer/{{event}}Consumer.ts"
+    }
+  ]
+}

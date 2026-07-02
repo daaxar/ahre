@@ -1,11 +1,29 @@
 {
   "name": "document.xlsx.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "steps": [
-    "bounded-context.ensure",
-    "xlsx.exporter.ensure",
-    "testing.unit.ensure",
-    "di.binding.ensure"
+  "id": "document.xlsx",
+  "description": "Ensure an XLSX exporter adapter.",
+  "aliases": [
+    "xlsx exporter",
+    "excel export"
+  ],
+  "tags": [
+    "xlsx",
+    "excel",
+    "document"
+  ],
+  "required": [
+    "name",
+    "context"
+  ],
+  "example": "ahre code document.xlsx --name OrdersReport --context Orders --json",
+  "tasks": [
+    {
+      "id": "context",
+      "intent": "context.folders.ensure"
+    },
+    {
+      "id": "xlsx",
+      "intent": "xlsx.exporter.ensure"
+    }
   ]
 }

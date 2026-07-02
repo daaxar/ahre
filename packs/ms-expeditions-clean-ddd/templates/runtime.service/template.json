@@ -1,0 +1,33 @@
+{
+  "name": "runtime.service",
+  "description": "Docker, Compose, environment and PM2 runtime.",
+  "variables": [
+    "service"
+  ],
+  "files": [
+    {
+      "source": "files/Dockerfile.tpl",
+      "target": "servs/{{service}}/Dockerfile"
+    },
+    {
+      "source": "files/docker-compose.yml.tpl",
+      "target": "servs/{{service}}/docker-compose.yml"
+    },
+    {
+      "source": "files/.env.dev.tpl",
+      "target": "servs/{{service}}/.env.dev"
+    },
+    {
+      "source": "files/.env.test.tpl",
+      "target": "servs/{{service}}/.env.test"
+    },
+    {
+      "source": "files/ecosystem.config.js.tpl",
+      "target": "servs/{{service}}/ecosystem.config.js"
+    },
+    {
+      "source": "files/tests/steps/world.ts.tpl",
+      "target": "servs/{{service}}/tests/steps/world.ts"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "name": "context.ddd",
+  "description": "Clean Architecture bounded-context folders.",
+  "variables": [
+    "context"
+  ],
+  "files": [
+    {
+      "source": "files/Domain/Model/.gitkeep.tpl",
+      "target": "src/{{context}}/Domain/Model/.gitkeep"
+    },
+    {
+      "source": "files/Domain/ValueObject/.gitkeep.tpl",
+      "target": "src/{{context}}/Domain/ValueObject/.gitkeep"
+    },
+    {
+      "source": "files/Domain/Repository/.gitkeep.tpl",
+      "target": "src/{{context}}/Domain/Repository/.gitkeep"
+    },
+    {
+      "source": "files/Domain/Event/.gitkeep.tpl",
+      "target": "src/{{context}}/Domain/Event/.gitkeep"
+    },
+    {
+      "source": "files/Domain/Collection/.gitkeep.tpl",
+      "target": "src/{{context}}/Domain/Collection/.gitkeep"
+    },
+    {
+      "source": "files/Domain/Specification/.gitkeep.tpl",
+      "target": "src/{{context}}/Domain/Specification/.gitkeep"
+    },
+    {
+      "source": "files/Domain/Error/.gitkeep.tpl",
+      "target": "src/{{context}}/Domain/Error/.gitkeep"
+    },
+    {
+      "source": "files/Domain/Exception/.gitkeep.tpl",
+      "target": "src/{{context}}/Domain/Exception/.gitkeep"
+    },
+    {
+      "source": "files/Domain/Iterator/.gitkeep.tpl",
+      "target": "src/{{context}}/Domain/Iterator/.gitkeep"
+    },
+    {
+      "source": "files/Application/UseCase/.gitkeep.tpl",
+      "target": "src/{{context}}/Application/UseCase/.gitkeep"
+    },
+    {
+      "source": "files/Application/Service/.gitkeep.tpl",
+      "target": "src/{{context}}/Application/Service/.gitkeep"
+    },
+    {
+      "source": "files/Infrastructure/Express/.gitkeep.tpl",
+      "target": "src/{{context}}/Infrastructure/Express/.gitkeep"
+    },
+    {
+      "source": "files/Infrastructure/Persistence/.gitkeep.tpl",
+      "target": "src/{{context}}/Infrastructure/Persistence/.gitkeep"
+    },
+    {
+      "source": "files/Infrastructure/Pdf/.gitkeep.tpl",
+      "target": "src/{{context}}/Infrastructure/Pdf/.gitkeep"
+    },
+    {
+      "source": "files/Infrastructure/Xlsx/.gitkeep.tpl",
+      "target": "src/{{context}}/Infrastructure/Xlsx/.gitkeep"
+    },
+    {
+      "source": "files/Infrastructure/UI/Controller/.gitkeep.tpl",
+      "target": "src/{{context}}/Infrastructure/UI/Controller/.gitkeep"
+    },
+    {
+      "source": "files/Infrastructure/UI/Consumer/.gitkeep.tpl",
+      "target": "src/{{context}}/Infrastructure/UI/Consumer/.gitkeep"
+    }
+  ]
+}

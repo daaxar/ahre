@@ -1,6 +1,5 @@
 {
   "name": "service.workspace.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "level": "component"
+  "description": "Ensure service package, TypeScript and Jest configuration.",
+  "template": "service.workspace"
 }

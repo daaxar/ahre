@@ -1,11 +1,31 @@
 {
   "name": "consumer.event.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "steps": [
-    "bounded-context.ensure",
-    "consumer.ensure",
-    "testing.command.ensure",
-    "di.binding.ensure"
+  "id": "consumer.event",
+  "description": "Ensure an event consumer.",
+  "aliases": [
+    "event consumer",
+    "message consumer",
+    "queue consumer"
+  ],
+  "tags": [
+    "event",
+    "consumer",
+    "amqp",
+    "sqs"
+  ],
+  "required": [
+    "event",
+    "context"
+  ],
+  "example": "ahre code consumer.event --event OrderWasCreated --context Orders --json",
+  "tasks": [
+    {
+      "id": "context",
+      "intent": "context.folders.ensure"
+    },
+    {
+      "id": "consumer",
+      "intent": "consumer.ensure"
+    }
   ]
 }

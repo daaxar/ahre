@@ -1,0 +1,5 @@
+{
+  "name": "runtime.service.ensure",
+  "description": "Ensure Docker, environment, PM2 and test world files.",
+  "template": "runtime.service"
+}

@@ -1,6 +1,5 @@
 {
   "name": "repository.interface.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "level": "component"
+  "description": "Ensure repository interface.",
+  "template": "entity.repository"
 }

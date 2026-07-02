@@ -1,9 +1,25 @@
 {
   "name": "bounded-context.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "steps": [
-    "context.folders.ensure",
-    "inventory.context.update"
+  "id": "context.ddd",
+  "description": "Ensure Clean Architecture bounded-context folders.",
+  "aliases": [
+    "bounded context",
+    "ddd context",
+    "domain context"
+  ],
+  "tags": [
+    "ddd",
+    "context",
+    "domain"
+  ],
+  "required": [
+    "context"
+  ],
+  "example": "ahre code context.ddd --context Orders --json",
+  "tasks": [
+    {
+      "id": "folders",
+      "intent": "context.folders.ensure"
+    }
   ]
 }

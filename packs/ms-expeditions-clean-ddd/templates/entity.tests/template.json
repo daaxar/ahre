@@ -1,0 +1,18 @@
+{
+  "name": "entity.tests",
+  "description": "Unit and API test skeletons.",
+  "variables": [
+    "context",
+    "entity"
+  ],
+  "files": [
+    {
+      "source": "files/tests/unit/Context/Application/UseCase/CreateEntity/CreateEntity.test.ts.tpl",
+      "target": "tests/unit/{{context}}/Application/UseCase/Create{{entity}}/Create{{entity}}.test.ts"
+    },
+    {
+      "source": "files/tests/api/Context/create-entity.feature.tpl",
+      "target": "tests/api/{{context}}/create-{{entity}}.feature"
+    }
+  ]
+}

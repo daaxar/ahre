@@ -1,6 +1,6 @@
 {
   "name": "ahre-cli",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "AhRE deterministic capability engine with a minimal public CLI and composable filesystem definitions",
   "type": "module",
   "bin": {

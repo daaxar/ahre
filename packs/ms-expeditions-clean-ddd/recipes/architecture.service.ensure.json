@@ -1,13 +1,44 @@
 {
   "name": "architecture.service.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "steps": [
-    "service.workspace.ensure",
-    "shared.kernel.ensure",
-    "messaging.shared.ensure",
-    "security.rbac.ensure",
-    "testing.suite.ensure",
-    "runtime.docker.ensure"
+  "id": "service.http",
+  "description": "Ensure a complete TypeScript HTTP service workspace following the architecture baseline.",
+  "aliases": [
+    "web service",
+    "http service",
+    "web server",
+    "api service",
+    "rest service"
+  ],
+  "tags": [
+    "service",
+    "http",
+    "api",
+    "typescript"
+  ],
+  "required": [
+    "service"
+  ],
+  "example": "ahre code service.http --service orders --json",
+  "tasks": [
+    {
+      "id": "workspace",
+      "intent": "service.workspace.ensure"
+    },
+    {
+      "id": "bootstrap",
+      "intent": "service.bootstrap.ensure"
+    },
+    {
+      "id": "shared-domain",
+      "intent": "shared.domain.ensure"
+    },
+    {
+      "id": "shared-infrastructure",
+      "intent": "shared.infrastructure.ensure"
+    },
+    {
+      "id": "runtime",
+      "intent": "runtime.service.ensure"
+    }
   ]
 }

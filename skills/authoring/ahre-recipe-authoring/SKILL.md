@@ -1,47 +1,10 @@
 ---
-name: "ahre-recipe-authoring"
-description: "Write and maintain AhRE recipes that compose intents from macro capabilities to micro code operations."
+name: "AhRE recipe authoring"
+description: "Compose executable intents into a public or internal deterministic capability."
 ---
 
-# AhRE Recipe Authoring Skill
+# AhRE recipe authoring
 
-## Use when
+Read `ahre-template-authoring` first. A recipe is declarative JSON under `packs/<catalog>/recipes/`.
 
-Use this skill only when the user explicitly asks to extend AhRE by creating or modifying recipes.
-
-## Goal
-
-Create declarative, idempotent, composable recipes that converge a repository toward an architectural state.
-
-## Recipe principles
-
-- A recipe represents desired state, not just file creation.
-- Recipes must be idempotent.
-- Macro recipes may call component recipes and internal intents.
-- Execution must be plan/apply friendly.
-- Destructive changes require explicit blockers or confirmation.
-- Recipes must update semantic inventory.
-
-## Required recipe shape
-
-```yaml
-name: "entity.capability.ensure"
-kind: "recipe"
-visibility: "public"
-description: "Ensure an entity capability across layers."
-inputs: {}
-steps: []
-safety:
-  idempotent: true
-  destructive: false
-  requiresPlan: true
-effects:
-  inventory: []
-```
-
-## Anti-patterns
-
-- Recipes that invent business rules.
-- Recipes that cannot be safely re-run.
-- Recipes that create files without updating inventory.
-- Recipes that hide blockers as warnings.
+Use `id` only when the recipe must be publicly discoverable through `ahre find`, `ahre help`, and `ahre code`. Compose existing intents through ordered `tasks`. Do not implement rendering or business decisions in recipes. Validate with `ahre doctor --json` and smoke-test the public command twice for idempotency.

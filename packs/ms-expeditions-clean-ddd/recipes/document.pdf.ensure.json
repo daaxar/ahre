@@ -1,11 +1,28 @@
 {
   "name": "document.pdf.ensure",
-  "idempotent": true,
-  "safeByDefault": true,
-  "steps": [
-    "bounded-context.ensure",
-    "pdf.renderer.ensure",
-    "testing.unit.ensure",
-    "di.binding.ensure"
+  "id": "document.pdf",
+  "description": "Ensure a PDF renderer adapter.",
+  "aliases": [
+    "pdf renderer",
+    "generate pdf"
+  ],
+  "tags": [
+    "pdf",
+    "document"
+  ],
+  "required": [
+    "name",
+    "context"
+  ],
+  "example": "ahre code document.pdf --name Invoice --context Orders --json",
+  "tasks": [
+    {
+      "id": "context",
+      "intent": "context.folders.ensure"
+    },
+    {
+      "id": "pdf",
+      "intent": "pdf.renderer.ensure"
+    }
   ]
 }

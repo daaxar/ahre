@@ -1,6 +1,15 @@
-# AhRE CLI v0.8.0
+# AhRE CLI v0.8.1
 
 AhRE is a deterministic capability engine for coding agents. It is simple to invoke, composable internally, and explicit about everything it creates or changes.
+
+## What changed in v0.8.1
+
+- Public capabilities are discovered from recipe metadata in the filesystem catalog instead of being hardcoded in the CLI.
+- The bundled `ms-expeditions-clean-ddd` catalog now contains executable templates with real target files derived from `ARCHITECTURE.md`.
+- Recipes compose intents and intents reference those templates.
+- Generic execution reports deterministic `logicSlots` extracted from generated template markers.
+- Authoring skills now specify the exact directory, metadata, variable, task, slot, validation and smoke-test contracts Codex must follow.
+
 
 ## Public CLI
 
@@ -45,7 +54,7 @@ service.http
 └── quality.typescript
 ```
 
-Definitions live in human-readable filesystem trees. Existing `packs/`, recipes, intents, templates, policies, tasks, slots, inventory, graph and quality machinery remain implementation details and extension mechanisms. They are not required knowledge for normal AhRE use.
+Definitions live in human-readable filesystem trees and are the source of generation behavior. Existing `packs/`, recipes, intents, templates, policies, tasks, slots, inventory, graph and quality machinery remain implementation details and extension mechanisms. They are not required knowledge for normal AhRE use.
 
 ## Deterministic response
 
