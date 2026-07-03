@@ -4,5 +4,15 @@
   "requires": [
     "security.jwt",
     "security.rbac"
-  ]
+  ],
+  "arguments": {},
+  "aliases": [],
+  "tags": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "files": [],
+  "slots": [],
+  "example": "ahre code security.jwt-rbac --json",
+  "usage": "ahre code security.jwt-rbac --json"
 }

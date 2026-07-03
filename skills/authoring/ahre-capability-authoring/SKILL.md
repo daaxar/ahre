@@ -1,65 +1,121 @@
 ---
-name: "AhRE capability pack authoring"
-description: "Create composable AhRE capability packs without recipes, intents or separate template registries."
+name: "AhRE Capability Authoring"
+description: "Create deterministic filesystem capabilities with explicit arguments, relations, preconditions, files, slots, and minimal generation."
 ---
 
-# AhRE capability pack authoring
+# AhRE Capability Authoring
 
-A pack is a distribution namespace containing capabilities. Do not create `recipes/`, `intents/` or `templates/` registries.
+Create a capability at:
 
 ```text
-packs/<pack>/
-├── pack.json
-├── capabilities/
-│   └── <capability id as folders>/
-│       ├── capability.json
-│       └── files/
-└── policies/
+packs/<catalog>/capabilities/<id-as-folders>/
+├── capability.json
+└── files/
 ```
 
-For `entity.create`, use `capabilities/entity/create/capability.json`.
+For `controller.http.command`, use:
 
-A capability may declare:
+```text
+capabilities/controller/http/command/
+```
 
-- `requires`: indispensable capabilities executed automatically.
-- `files`: deterministic templates owned by this capability.
-- `suggests`: optional follow-ups returned to the LLM and never auto-executed.
-- `alternatives`: selectable implementations or transports.
-- `required`: CLI variables.
-- `targetRoot`: optional rendered execution root.
+Do not create recipe, intent, or template registries. A capability is the single authoring concept.
 
-## Non-negotiable minimal-generation rule
+## Required manifest contract
 
-A capability MUST generate only artifacts required for its declared result to be complete.
-
-Do not generate an artifact merely because it is common or may be useful later. Generic DDD capabilities MUST NOT force HTTP, Express, consumers, MongoDB, SQL, PDF, XLSX, messaging, security, logging or runtime files.
-
-Put indispensable composition in `requires`. Put common but non-universal additions in `suggests`. Put mutually selectable choices in `alternatives`.
-
-Before accepting a capability, verify:
-
-1. Every generated file is necessary in 100% of valid uses of that capability.
-2. No transport or persistence technology is imposed by a generic domain/application capability.
-3. Optional infrastructure appears only in `suggests` or `alternatives`.
-4. Each dependency in `requires` is truly indispensable.
-5. The capability is idempotent and never silently overwrites different content.
-6. The response will clearly expose created files, dependency execution, slots, quality and optional next capabilities.
-
-Example:
+Every capability must declare:
 
 ```json
 {
-  "id": "context.ddd",
-  "required": ["context"],
-  "files": [
-    { "source": "files/Domain/.gitkeep.tpl", "target": "src/{{context}}/Domain/.gitkeep" },
-    { "source": "files/Application/.gitkeep.tpl", "target": "src/{{context}}/Application/.gitkeep" }
-  ],
-  "suggests": [
-    { "capability": "controller.http", "when": "Expose a use case over HTTP." },
-    { "capability": "repository.mongo", "when": "Use MongoDB persistence." }
+  "id": "controller.http.command",
+  "description": "Create an HTTP adapter for an existing command use case.",
+  "aliases": ["http command controller"],
+  "tags": ["http", "controller", "command"],
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    }
+  },
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "files": [],
+  "slots": [],
+  "usage": "ahre code controller.http.command --context <Context> --json",
+  "example": "ahre code controller.http.command --context Auth --json"
+}
+```
+
+## Deterministic relations
+
+AhRE does not infer relationships.
+
+- `requires`: indispensable capabilities executed first.
+- `suggests`: optional capabilities communicated but never executed automatically.
+- `alternatives`: declared choices communicated without selection.
+- Never duplicate inverse relationships such as `requiredBy`; they are calculated in memory.
+
+## Minimal-generation rule
+
+A capability must create only artifacts necessary in 100% of its valid uses.
+
+Do not generate files merely because they are common. Generic domain/application capabilities must not force HTTP, persistence, consumers, messaging, documents, security, logging, or runtime components. Put common non-universal additions in `suggests` or `alternatives`.
+
+## Arguments and naming
+
+- Declare every variable used by file targets, file contents, preconditions, and slots.
+- Use named flags only.
+- Declare `type`, `case`, `description`, and `example`.
+- Ensure the example contains every required flag.
+- Prefer visible normalization only when deterministic; otherwise block invalid input.
+
+## Preconditions
+
+Declare environmental and artifact requirements explicitly:
+
+```json
+{
+  "preconditions": [
+    { "type": "package", "name": "routing-controllers" },
+    { "type": "tsconfig", "property": "experimentalDecorators", "equals": true },
+    { "type": "artifact", "kind": "application.usecase", "path": "src/{{context}}/Application/UseCase/{{usecase}}/{{usecase}}.ts" }
   ]
 }
 ```
 
-Validate with `ahre doctor --json`, then test `ahre find`, `ahre help`, `ahre code` and `ahre inspect last`.
+Preflight must complete before any file is written.
+
+## Slots
+
+Declare slot semantics in the manifest. Markers only locate the range.
+
+```json
+{
+  "slots": [
+    {
+      "id": "{{context}}.{{controller}}.transportMapping",
+      "file": "src/{{context}}/Infrastructure/UI/Controller/{{controller}}.ts",
+      "kind": "transport-mapping",
+      "purpose": "Map the HTTP request into the application use-case input."
+    }
+  ]
+}
+```
+
+## Validation workflow
+
+```bash
+ahre doctor --json
+ahre list --json
+ahre find "<metadata terms>" --json
+ahre help <capability> --json
+ahre code <capability> <all required flags> --quality off --json
+ahre inspect last --json
+```
+
+Do not add capability-specific behavior to the core. Add or modify only declarative manifests and files unless extending the generic engine itself.

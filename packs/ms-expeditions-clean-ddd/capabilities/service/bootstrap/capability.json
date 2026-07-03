@@ -14,5 +14,36 @@
       "source": "files/config/container/services.yaml.tpl",
       "target": "config/container/services.yaml"
     }
-  ]
+  ],
+  "arguments": {
+    "service": {
+      "required": true,
+      "type": "identifier",
+      "case": "kebab-case",
+      "description": "service value.",
+      "example": "orders"
+    }
+  },
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [
+    {
+      "id": "service.{{service}}.kernel.bootstrap",
+      "file": "src/Kernel.ts",
+      "kind": "extension",
+      "purpose": "Capability extension point."
+    },
+    {
+      "id": "service.{{service}}.di.bindings",
+      "file": "config/container/services.yaml",
+      "kind": "extension",
+      "purpose": "Capability extension point."
+    }
+  ],
+  "example": "ahre code service.bootstrap --service orders --json",
+  "usage": "ahre code service.bootstrap --service <Service> --json"
 }

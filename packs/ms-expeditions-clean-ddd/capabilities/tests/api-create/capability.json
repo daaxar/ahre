@@ -1,14 +1,35 @@
 {
   "id": "tests.api-create",
   "description": "Create the optional API feature for an HTTP create endpoint.",
-  "required": [
-    "context",
-    "entity"
-  ],
   "files": [
     {
       "source": "files/create.feature.tpl",
       "target": "tests/api/{{context}}/create-{{entity}}.feature"
     }
-  ]
+  ],
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    },
+    "entity": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Domain entity name.",
+      "example": "Order"
+    }
+  },
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [],
+  "example": "ahre code tests.api-create --context Auth --entity Order --json",
+  "usage": "ahre code tests.api-create --context <Context> --entity <Entity> --json"
 }

@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+const cli=path.resolve('bin/ahre.mjs');
+const cwd=fs.mkdtempSync(path.join(os.tmpdir(),'ahre-test-'));
+const run=(args)=>{const r=spawnSync(process.execPath,[cli,...args],{cwd,encoding:'utf8'}); return {code:r.status,json:JSON.parse(r.stdout)};};
+let r=run(['list','--json']); assert.equal(r.json.status,'OK'); assert.ok(r.json.count>0);
+r=run(['find','login authentication controller','--json']); assert.ok(['PARTIAL','NOT_FOUND'].includes(r.json.status));
+r=run(['help','controller.http.command','--json']); assert.equal(r.json.status,'OK'); assert.ok(r.json.capability.arguments.route);
+r=run(['code','controller.http.command','--arg','context=Auth','--json']); assert.equal(r.json.error.code,'UNKNOWN_OPTION');
+r=run(['code','controller.http.command','--json']); assert.equal(r.json.reason,'MISSING_ARGUMENTS');
+r=run(['inspect','last','--json']); assert.equal(r.json.status,'OK'); assert.equal(r.json.operation.reason,'MISSING_ARGUMENTS');
+r=run(['recipe','list','--json']); assert.equal(r.json.error.code,'UNKNOWN_COMMAND');
+r=run(['code','service.http','--service','smoke','--quality','off','--json']); assert.equal(r.json.status,'OK'); assert.ok(fs.existsSync(path.join(cwd,'servs/smoke/package.json')));
+console.log('ok');

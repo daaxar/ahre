@@ -1,14 +1,42 @@
 {
   "id": "repository.mongo",
   "description": "Create Mongo repository adapter.",
-  "required": [
-    "context",
-    "entity"
-  ],
   "files": [
     {
       "source": "files/src/Context/Infrastructure/Persistence/MongoEntityRepository.ts.tpl",
       "target": "src/{{context}}/Infrastructure/Persistence/Mongo{{entity}}Repository.ts"
     }
-  ]
+  ],
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    },
+    "entity": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Domain entity name.",
+      "example": "Order"
+    }
+  },
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [
+    {
+      "id": "{{context}}.Mongo{{entity}}Repository.save.mapping",
+      "file": "src/{{context}}/Infrastructure/Persistence/Mongo{{entity}}Repository.ts",
+      "kind": "extension",
+      "purpose": "Capability extension point."
+    }
+  ],
+  "example": "ahre code repository.mongo --context Auth --entity Order --json",
+  "usage": "ahre code repository.mongo --context <Context> --entity <Entity> --json"
 }

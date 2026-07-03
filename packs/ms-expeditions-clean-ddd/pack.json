@@ -1,6 +1,6 @@
 {
   "name": "ms-expeditions-clean-ddd",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "source": "ARCHITECTURE.md",
   "description": "Executable architecture definitions derived from ARCHITECTURE.md.",
   "layoutVersion": 1,

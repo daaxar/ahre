@@ -1,14 +1,35 @@
 {
   "id": "tests.entity-create",
   "description": "Create the unit test skeleton for the create use case.",
-  "required": [
-    "context",
-    "entity"
-  ],
   "files": [
     {
       "source": "files/test.ts.tpl",
       "target": "tests/unit/{{context}}/Application/UseCase/Create{{entity}}/Create{{entity}}.test.ts"
     }
-  ]
+  ],
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    },
+    "entity": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Domain entity name.",
+      "example": "Order"
+    }
+  },
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [],
+  "example": "ahre code tests.entity-create --context Auth --entity Order --json",
+  "usage": "ahre code tests.entity-create --context <Context> --entity <Entity> --json"
 }

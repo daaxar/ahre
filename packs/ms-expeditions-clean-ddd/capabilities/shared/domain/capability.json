@@ -22,5 +22,15 @@
       "source": "files/src/Shared/Domain/ValueObject/DateTime.ts.tpl",
       "target": "src/Shared/Domain/ValueObject/DateTime.ts"
     }
-  ]
+  ],
+  "arguments": {},
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [],
+  "example": "ahre code shared.domain --json",
+  "usage": "ahre code shared.domain --json"
 }

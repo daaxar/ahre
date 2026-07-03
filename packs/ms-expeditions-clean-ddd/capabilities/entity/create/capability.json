@@ -12,10 +12,6 @@
     "ddd",
     "create"
   ],
-  "required": [
-    "context",
-    "entity"
-  ],
   "requires": [
     "context.ddd",
     "entity.aggregate",
@@ -26,7 +22,7 @@
   ],
   "suggests": [
     {
-      "capability": "controller.http",
+      "capability": "controller.http.entity-create",
       "when": "Expose Create{{entity}} through HTTP."
     },
     {
@@ -44,12 +40,32 @@
   ],
   "alternatives": {
     "transport": [
-      "controller.http",
+      "controller.http.entity-create",
       "consumer.event"
     ],
     "persistence": [
       "repository.mongo"
     ]
   },
-  "example": "ahre code entity.create --entity Order --context Orders --json"
+  "example": "ahre code entity.create --context Auth --entity Order --json",
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    },
+    "entity": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Domain entity name.",
+      "example": "Order"
+    }
+  },
+  "preconditions": [],
+  "files": [],
+  "slots": [],
+  "usage": "ahre code entity.create --context <Context> --entity <Entity> --json"
 }

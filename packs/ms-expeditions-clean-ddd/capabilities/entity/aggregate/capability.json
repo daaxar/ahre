@@ -1,10 +1,6 @@
 {
   "id": "entity.aggregate",
   "description": "Create aggregate and identifier.",
-  "required": [
-    "context",
-    "entity"
-  ],
   "files": [
     {
       "source": "files/src/Context/Domain/Model/Entity.ts.tpl",
@@ -14,5 +10,43 @@
       "source": "files/src/Context/Domain/ValueObject/EntityId.ts.tpl",
       "target": "src/{{context}}/Domain/ValueObject/{{entity}}Id.ts"
     }
-  ]
+  ],
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    },
+    "entity": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Domain entity name.",
+      "example": "Order"
+    }
+  },
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [
+    {
+      "id": "{{context}}.{{entity}}.create.domainRules",
+      "file": "src/{{context}}/Domain/Model/{{entity}}.ts",
+      "kind": "domain-rules",
+      "purpose": "Place aggregate business invariants here."
+    },
+    {
+      "id": "{{context}}.{{entity}}.create.domainEvents",
+      "file": "src/{{context}}/Domain/Model/{{entity}}.ts",
+      "kind": "extension",
+      "purpose": "Capability extension point."
+    }
+  ],
+  "example": "ahre code entity.aggregate --context Auth --entity Order --json",
+  "usage": "ahre code entity.aggregate --context <Context> --entity <Entity> --json"
 }

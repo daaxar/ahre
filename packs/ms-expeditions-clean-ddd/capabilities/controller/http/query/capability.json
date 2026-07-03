@@ -1,0 +1,78 @@
+{
+  "id": "controller.http.query",
+  "description": "Create an HTTP adapter for an existing query use case.",
+  "aliases": [
+    "http query controller",
+    "query endpoint"
+  ],
+  "tags": [
+    "http",
+    "controller",
+    "query"
+  ],
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    },
+    "controller": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Controller class name.",
+      "example": "LoginController"
+    },
+    "usecase": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Application use-case class name.",
+      "example": "Login"
+    },
+    "route": {
+      "required": true,
+      "type": "route",
+      "case": "kebab-case",
+      "description": "HTTP route.",
+      "example": "/login"
+    }
+  },
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [
+    {
+      "type": "package",
+      "name": "routing-controllers"
+    },
+    {
+      "type": "tsconfig",
+      "property": "experimentalDecorators",
+      "equals": true
+    },
+    {
+      "type": "artifact",
+      "kind": "application.usecase",
+      "path": "src/{{context}}/Application/UseCase/{{usecase}}/{{usecase}}.ts"
+    }
+  ],
+  "files": [
+    {
+      "source": "files/src/Context/Infrastructure/UI/Controller/Controller.ts.tpl",
+      "target": "src/{{context}}/Infrastructure/UI/Controller/{{controller}}.ts"
+    }
+  ],
+  "slots": [
+    {
+      "id": "{{context}}.{{controller}}.transportMapping",
+      "file": "src/{{context}}/Infrastructure/UI/Controller/{{controller}}.ts",
+      "kind": "transport-mapping",
+      "purpose": "Map the HTTP request into the application use-case input."
+    }
+  ],
+  "usage": "ahre code controller.http.query --context <Context> --controller <Controller> --usecase <Usecase> --route <Route> --json",
+  "example": "ahre code controller.http.query --context Auth --controller LoginController --usecase Login --route /login --json"
+}

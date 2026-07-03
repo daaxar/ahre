@@ -6,5 +6,15 @@
       "source": "files/JwtVerifier.ts.tpl",
       "target": "src/Shared/Infrastructure/Security/JwtVerifier.ts"
     }
-  ]
+  ],
+  "arguments": {},
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [],
+  "example": "ahre code security.jwt --json",
+  "usage": "ahre code security.jwt --json"
 }

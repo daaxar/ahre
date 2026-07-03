@@ -13,9 +13,6 @@
     "typescript",
     "api"
   ],
-  "required": [
-    "service"
-  ],
   "targetRoot": "servs/{{service}}",
   "requires": [
     "service.workspace",
@@ -44,5 +41,19 @@
       "when": "The service needs the architecture logging adapter."
     }
   ],
-  "example": "ahre code service.http --service orders --json"
+  "example": "ahre code service.http --service orders --json",
+  "arguments": {
+    "service": {
+      "required": true,
+      "type": "identifier",
+      "case": "kebab-case",
+      "description": "Service workspace name.",
+      "example": "orders"
+    }
+  },
+  "alternatives": {},
+  "preconditions": [],
+  "files": [],
+  "slots": [],
+  "usage": "ahre code service.http --service <Service> --json"
 }

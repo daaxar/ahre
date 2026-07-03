@@ -1,14 +1,42 @@
 {
   "id": "consumer.event",
   "description": "Create event consumer adapter.",
-  "required": [
-    "context",
-    "event"
-  ],
   "files": [
     {
       "source": "files/src/Context/Infrastructure/UI/Consumer/EventConsumer.ts.tpl",
       "target": "src/{{context}}/Infrastructure/UI/Consumer/{{event}}Consumer.ts"
     }
-  ]
+  ],
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    },
+    "event": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Domain or integration event name.",
+      "example": "OrderCreated"
+    }
+  },
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [
+    {
+      "id": "{{context}}.{{event}}Consumer.consume.mapping",
+      "file": "src/{{context}}/Infrastructure/UI/Consumer/{{event}}Consumer.ts",
+      "kind": "extension",
+      "purpose": "Capability extension point."
+    }
+  ],
+  "example": "ahre code consumer.event --context Auth --event OrderCreated --json",
+  "usage": "ahre code consumer.event --context <Context> --event <Event> --json"
 }

@@ -4,5 +4,15 @@
   "requires": [
     "messaging.bus",
     "messaging.sqs"
-  ]
+  ],
+  "arguments": {},
+  "aliases": [],
+  "tags": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "files": [],
+  "slots": [],
+  "example": "ahre code messaging.amqp-sqs --json",
+  "usage": "ahre code messaging.amqp-sqs --json"
 }

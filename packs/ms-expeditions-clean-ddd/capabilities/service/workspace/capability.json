@@ -1,9 +1,6 @@
 {
   "id": "service.workspace",
   "description": "Create the minimal TypeScript service workspace.",
-  "required": [
-    "service"
-  ],
   "files": [
     {
       "source": "files/package.json.tpl",
@@ -17,5 +14,23 @@
       "source": "files/jest.config.cjs.tpl",
       "target": "jest.config.cjs"
     }
-  ]
+  ],
+  "arguments": {
+    "service": {
+      "required": true,
+      "type": "identifier",
+      "case": "kebab-case",
+      "description": "Service workspace name.",
+      "example": "orders"
+    }
+  },
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [],
+  "example": "ahre code service.workspace --service orders --json",
+  "usage": "ahre code service.workspace --service <Service> --json"
 }

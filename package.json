@@ -1,7 +1,7 @@
 {
   "name": "ahre-cli",
-  "version": "0.8.2",
-  "description": "AhRE deterministic capability engine with minimal generation and explicit optional suggestions",
+  "version": "0.9.0",
+  "description": "Deterministic capability engine",
   "type": "module",
   "bin": {
     "ahre": "./bin/ahre.mjs"
@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node ./bin/ahre.mjs",
     "smoke": "node ./bin/ahre.mjs find \"http service\" --json && node ./bin/ahre.mjs help && node ./bin/ahre.mjs doctor --json",
-    "check": "node --check ./src/ahre-cli.mjs && node --check ./bin/ahre.mjs"
+    "check": "node --check ./src/ahre-cli.mjs && node --check ./bin/ahre.mjs",
+    "test": "node ./tests/cli.test.mjs",
+    "release:verify": "bash ./scripts/release-verify.sh"
   },
   "keywords": [
     "architecture",

@@ -1,7 +1,7 @@
 import { Body, JsonController, Post } from 'routing-controllers';
 import { Create{{entity}} } from '../../../Application/UseCase/Create{{entity}}/Create{{entity}}';
 
-@JsonController('/{{entity}}')
+@JsonController('{{route}}')
 export class {{entity}}Controller {
   constructor(private readonly create{{entity}}: Create{{entity}}) {}
   @Post()

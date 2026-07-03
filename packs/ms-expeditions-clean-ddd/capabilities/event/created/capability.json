@@ -1,14 +1,35 @@
 {
   "id": "event.created",
   "description": "Create domain created event.",
-  "required": [
-    "context",
-    "entity"
-  ],
   "files": [
     {
       "source": "files/src/Context/Domain/Event/EntityWasCreated.ts.tpl",
       "target": "src/{{context}}/Domain/Event/{{entity}}WasCreated.ts"
     }
-  ]
+  ],
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    },
+    "entity": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Domain entity name.",
+      "example": "Order"
+    }
+  },
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [],
+  "example": "ahre code event.created --context Auth --entity Order --json",
+  "usage": "ahre code event.created --context <Context> --entity <Entity> --json"
 }

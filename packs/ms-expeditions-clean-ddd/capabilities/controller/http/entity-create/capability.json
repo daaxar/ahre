@@ -1,0 +1,72 @@
+{
+  "id": "controller.http.entity-create",
+  "description": "Create an HTTP adapter for an existing Create<Entity> command use case.",
+  "aliases": [
+    "entity create controller",
+    "http create controller"
+  ],
+  "tags": [
+    "http",
+    "controller",
+    "entity",
+    "create"
+  ],
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    },
+    "entity": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Domain entity name.",
+      "example": "Order"
+    },
+    "route": {
+      "required": true,
+      "type": "route",
+      "case": "kebab-case",
+      "description": "HTTP route.",
+      "example": "/login"
+    }
+  },
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [
+    {
+      "type": "package",
+      "name": "routing-controllers"
+    },
+    {
+      "type": "tsconfig",
+      "property": "experimentalDecorators",
+      "equals": true
+    },
+    {
+      "type": "artifact",
+      "kind": "application.usecase",
+      "path": "src/{{context}}/Application/UseCase/Create{{entity}}/Create{{entity}}.ts"
+    }
+  ],
+  "files": [
+    {
+      "source": "files/src/Context/Infrastructure/UI/Controller/EntityController.ts.tpl",
+      "target": "src/{{context}}/Infrastructure/UI/Controller/{{entity}}Controller.ts"
+    }
+  ],
+  "slots": [
+    {
+      "id": "{{context}}.{{entity}}Controller.create.transportMapping",
+      "file": "src/{{context}}/Infrastructure/UI/Controller/{{entity}}Controller.ts",
+      "kind": "transport-mapping",
+      "purpose": "Map the HTTP request into the Create<Entity> use-case input."
+    }
+  ],
+  "example": "ahre code controller.http.entity-create --context Auth --entity Order --route /login --json",
+  "usage": "ahre code controller.http.entity-create --context <Context> --entity <Entity> --route <Route> --json"
+}

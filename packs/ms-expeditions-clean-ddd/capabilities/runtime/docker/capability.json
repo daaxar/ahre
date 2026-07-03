@@ -1,9 +1,6 @@
 {
   "id": "runtime.docker",
   "description": "Create optional Docker, environment, PM2 and test-world runtime files.",
-  "required": [
-    "service"
-  ],
   "files": [
     {
       "source": "files/Dockerfile.tpl",
@@ -29,5 +26,23 @@
       "source": "files/tests/steps/world.ts.tpl",
       "target": "tests/steps/world.ts"
     }
-  ]
+  ],
+  "arguments": {
+    "service": {
+      "required": true,
+      "type": "identifier",
+      "case": "kebab-case",
+      "description": "Service workspace name.",
+      "example": "orders"
+    }
+  },
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [],
+  "example": "ahre code runtime.docker --service orders --json",
+  "usage": "ahre code runtime.docker --service <Service> --json"
 }

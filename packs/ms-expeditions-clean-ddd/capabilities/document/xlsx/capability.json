@@ -1,13 +1,35 @@
 {
   "id": "document.xlsx",
   "description": "Create XLSX exporter adapter.",
-  "required": [
-    "context"
-  ],
   "files": [
     {
       "source": "files/src/Context/Infrastructure/Xlsx/NameXlsxExporter.ts.tpl",
       "target": "src/{{context}}/Infrastructure/Xlsx/{{name}}XlsxExporter.ts"
     }
-  ]
+  ],
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    },
+    "name": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "name value.",
+      "example": "DeliveryNote"
+    }
+  },
+  "aliases": [],
+  "tags": [],
+  "requires": [],
+  "suggests": [],
+  "alternatives": {},
+  "preconditions": [],
+  "slots": [],
+  "example": "ahre code document.xlsx --context Auth --name DeliveryNote --json",
+  "usage": "ahre code document.xlsx --context <Context> --name <Name> --json"
 }

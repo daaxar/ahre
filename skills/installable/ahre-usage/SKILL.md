@@ -1,31 +1,39 @@
 ---
 name: "AhRE Usage"
-description: "Mandatory minimal workflow for using AhRE before manually creating or modifying code."
+description: "Use AhRE's six-command deterministic interface before manually creating or modifying architecture code."
 ---
 
 # AhRE Usage
 
-AhRE is deterministic. The LLM decides what must be built and supplies business logic. AhRE composes definitions, creates or updates files, exposes insertion slots, refreshes inventory/graph, runs quality checks, and reports exactly what happened.
+AhRE has exactly six public commands:
+
+```bash
+ahre list --json
+ahre find "<task>" --json
+ahre help [capability] --json
+ahre code <capability> [named flags] --json
+ahre inspect [last|subject] --json
+ahre doctor --json
+```
 
 ## Mandatory workflow
 
-Before manually writing architecture or scaffold code:
+1. Run `ahre list --json` when the available capabilities are unknown.
+2. Run `ahre find "<task>" --json` to search declared metadata only.
+3. Run `ahre help <capability> --json` to obtain the exact named flags.
+4. Run `ahre code <capability> ... --json` using only those flags.
+5. Use the returned files, slots, suggestions, preflight result, and quality diagnostics.
+6. Run `ahre inspect last --json` to recover the latest operation without scanning generated files.
+7. Run `ahre doctor --json` only to diagnose AhRE definitions or installation health.
 
-```bash
-ahre find "<task>" --json
-ahre help <capability> --json
-ahre code <capability> [arguments] --json
-```
+## Non-negotiable rules
 
-Never invent capability ids or arguments. Use `find` and `help` first when they are unknown.
-
-After `ahre code`, use the returned artifacts, slots, tasks, diagnostics, quality report, and next actions. Do not inspect generated files first.
-
-For later context:
-
-```bash
-ahre inspect last --json
-ahre inspect <subject> --json
-```
-
-Use manual code only for business-specific logic or when AhRE explicitly returns `BLOCKED`, `NOT_FOUND`, or insufficient context.
+- Never invent capability IDs.
+- Never invent argument names.
+- Never use `--arg key=value`.
+- Never inspect AhRE installation files or internal catalogs during normal use.
+- Never call commands outside `list`, `find`, `help`, `code`, `inspect`, and `doctor`.
+- If `find` returns `PARTIAL`, do not execute the partial match as though it covered the complete request.
+- If `code` returns `BLOCKED`, follow the exact returned reason and instruction.
+- Do not inspect newly generated files first. Prefer the returned slots, effects, diagnostics, and `inspect last`.
+- Manual implementation is reserved for business-specific logic or an explicitly unsupported capability.

@@ -11,9 +11,6 @@
     "context",
     "domain"
   ],
-  "required": [
-    "context"
-  ],
   "files": [
     {
       "source": "files/Domain/.gitkeep.tpl",
@@ -30,7 +27,7 @@
       "when": "The context needs an aggregate and create use case."
     },
     {
-      "capability": "controller.http",
+      "capability": "controller.http.entity-create",
       "when": "Expose a use case through HTTP."
     },
     {
@@ -52,12 +49,25 @@
   ],
   "alternatives": {
     "transport": [
-      "controller.http",
+      "controller.http.entity-create",
       "consumer.event"
     ],
     "persistence": [
       "repository.mongo"
     ]
   },
-  "example": "ahre code context.ddd --context Orders --json"
+  "example": "ahre code context.ddd --context Auth --json",
+  "arguments": {
+    "context": {
+      "required": true,
+      "type": "identifier",
+      "case": "PascalCase",
+      "description": "Bounded context name.",
+      "example": "Auth"
+    }
+  },
+  "requires": [],
+  "preconditions": [],
+  "slots": [],
+  "usage": "ahre code context.ddd --context <Context> --json"
 }
